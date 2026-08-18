@@ -139,6 +139,7 @@ export default function App() {
             message: `模型 ${data.filename} 已下载完毕，已自动载入本地模型库！`
           });
           fetchModels();
+          fetchBookmarks();
         } else if (data.status === 'failed') {
           addToast({
             type: 'error',
@@ -150,7 +151,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [addToast, fetchModels]);
+  }, [addToast, fetchModels, fetchBookmarks]);
 
   // 启动服务处理
   const handleStartServer = async (payload) => {

@@ -5,14 +5,14 @@ import path from 'path';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { llamaManager } from './llamaManager.js';
-import { getLocalModels, deleteModelFile, openInExplorer } from './modelManager.js';
+import { getLocalModels, deleteModelFile, openInExplorer, formatBytes } from './modelManager.js';
 import { hfDownloader, parseHfInput } from './hfDownloader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5175;
 
 app.use(cors());
 app.use(express.json());
@@ -23,6 +23,64 @@ const BOOKMARKS_PATH = path.join(__dirname, 'data', 'bookmarks.json');
 // 确保数据目录存在
 if (!fs.existsSync(path.join(__dirname, 'data'))) {
   fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+}
+
+/**
+ * 尝试通过 HEAD 请求获取远程 HuggingFace 文件的真实大小
+ */
+async function fetchRemoteFileSize(repoId, filename, endpoint = 'https://hf-mirror.com') {
+  if (!repoId || !filename) return null;
+  try {
+    const baseEndpoint = (endpoint || 'https://hf-mirror.com').replace(/\/+$/, '');
+    const url = `${baseEndpoint}/${repoId}/resolve/main/${encodeURIComponent(filename)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'LlamaManage/1.0' }
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const contentLength = res.headers.get('content-length');
+      if (contentLength) {
+        const bytes = parseInt(contentLength, 10);
+        if (!isNaN(bytes) && bytes > 0) {
+          return formatBytes(bytes);
+        }
+      }
+    }
+  } catch (e) {
+    // 忽略网络超时或解析错误
+  }
+  return null;
+}
+
+/**
+ * 将收藏夹条目与本地磁盘模型自动同步大小
+ */
+function syncBookmarksWithSize(bookmarks, modelsPath) {
+  if (!Array.isArray(bookmarks) || !modelsPath) return bookmarks;
+  let changed = false;
+  for (const bm of bookmarks) {
+    if (!bm.filename) continue;
+    const fullPath = path.join(modelsPath, bm.filename);
+    if (fs.existsSync(fullPath)) {
+      try {
+        const stats = fs.statSync(fullPath);
+        const formatted = formatBytes(stats.size);
+        if (bm.size !== formatted) {
+          bm.size = formatted;
+          changed = true;
+        }
+      } catch (e) {}
+    }
+  }
+  if (changed) {
+    saveBookmarks(bookmarks);
+  }
+  return bookmarks;
 }
 
 function loadConfig() {
@@ -199,25 +257,66 @@ app.post('/api/server/logs/clear', (req, res) => {
 });
 
 // 收藏模型管理
-app.get('/api/bookmarks', (req, res) => {
-  const bookmarks = loadBookmarks();
+app.get('/api/bookmarks', async (req, res) => {
+  const config = loadConfig();
+  let bookmarks = loadBookmarks();
+  bookmarks = syncBookmarksWithSize(bookmarks, config.modelsPath);
+
+  // 针对仍然为 "未知" 的条目，异步尝试拉取远程大小并回写
+  const unknownList = bookmarks.filter(b => (!b.size || b.size === '未知') && b.repoId && b.filename);
+  if (unknownList.length > 0) {
+    Promise.all(unknownList.map(async (bm) => {
+      const remoteSize = await fetchRemoteFileSize(bm.repoId, bm.filename, config.hfMirror);
+      if (remoteSize) {
+        bm.size = remoteSize;
+        return true;
+      }
+      return false;
+    })).then(results => {
+      if (results.some(r => r === true)) {
+        saveBookmarks(bookmarks);
+      }
+    }).catch(() => {});
+  }
+
   res.json({ success: true, bookmarks });
 });
 
-app.post('/api/bookmarks', (req, res) => {
+app.post('/api/bookmarks', async (req, res) => {
   try {
     const bookmark = req.body;
     if (!bookmark.repoId || !bookmark.filename) {
       return res.status(400).json({ success: false, error: '缺少 repoId 或 filename' });
     }
 
+    const config = loadConfig();
     const bookmarks = loadBookmarks();
     const existingIndex = bookmarks.findIndex(
       b => b.repoId === bookmark.repoId && b.filename === bookmark.filename
     );
 
+    // 优先检查本地磁盘是否已有该模型
+    let calculatedSize = bookmark.size;
+    const fullPath = path.join(config.modelsPath, bookmark.filename);
+    if (fs.existsSync(fullPath)) {
+      try {
+        const stats = fs.statSync(fullPath);
+        calculatedSize = formatBytes(stats.size);
+      } catch (e) {}
+    } else if (!calculatedSize || calculatedSize === '未知') {
+      // 尝试远程获取一次
+      const remoteSize = await fetchRemoteFileSize(bookmark.repoId, bookmark.filename, config.hfMirror);
+      if (remoteSize) {
+        calculatedSize = remoteSize;
+      }
+    }
+
     if (existingIndex >= 0) {
-      bookmarks[existingIndex] = { ...bookmarks[existingIndex], ...bookmark };
+      bookmarks[existingIndex] = { 
+        ...bookmarks[existingIndex], 
+        ...bookmark,
+        size: calculatedSize || bookmarks[existingIndex].size || '未知'
+      };
     } else {
       const newBm = {
         id: 'bm_' + Date.now(),
@@ -227,7 +326,7 @@ app.post('/api/bookmarks', (req, res) => {
         sourceUrl: bookmark.sourceUrl || `hf://${bookmark.repoId}/${bookmark.filename}`,
         description: bookmark.description || '',
         tags: bookmark.tags || [],
-        size: bookmark.size || '未知',
+        size: calculatedSize || '未知',
         addedAt: new Date().toISOString()
       };
       bookmarks.unshift(newBm);
@@ -363,6 +462,32 @@ app.post('/api/test-chat', async (req, res) => {
   }
 });
 
+// 全局下载完成监听：自动回写更新收藏夹条目的模型体积大小
+hfDownloader.on('download_completed', (job) => {
+  try {
+    const config = loadConfig();
+    let bookmarks = loadBookmarks();
+    let updated = false;
+    for (const bm of bookmarks) {
+      if (bm.filename === job.filename) {
+        if (job.totalFormatted && job.totalFormatted !== '未知' && job.totalFormatted !== '计算中...') {
+          bm.size = job.totalFormatted;
+          updated = true;
+        } else if (job.filePath && fs.existsSync(job.filePath)) {
+          const stats = fs.statSync(job.filePath);
+          bm.size = formatBytes(stats.size);
+          updated = true;
+        }
+      }
+    }
+    if (updated) {
+      saveBookmarks(bookmarks);
+    }
+  } catch (e) {
+    console.error('Error updating bookmark size on download completed:', e);
+  }
+});
+
 // Server-Sent Events (SSE) 实时事件通道
 app.get('/api/events', (req, res) => {
   res.writeHead(200, {
@@ -412,10 +537,25 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
   console.log(`  🦙 Llama.cpp 管理后台服务已在端口 ${PORT} 启动`);
-  console.log(`  控制台 Web 地址: http://127.0.0.1:${PORT}`);
+  console.log(`  🚀 运行进程 PID: ${process.pid}`);
+  console.log(`  🌐 本地 IPv4 访问: http://127.0.0.1:${PORT}`);
+  console.log(`  🌐 本地 IPv6/域名: http://localhost:${PORT}`);
   console.log(`====================================================`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`\n[INFO] 端口 ${PORT} 正在等待系统释放，1 秒后自动重试绑定...`);
+    setTimeout(() => {
+      server.close(() => {
+        server.listen(PORT, '0.0.0.0');
+      });
+    }, 1000);
+  } else {
+    console.error('Server error:', err);
+  }
 });
 

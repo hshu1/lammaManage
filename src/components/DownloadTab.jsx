@@ -378,6 +378,9 @@ export default function DownloadTab({
                         {(bm.tags || []).map((t, idx) => (
                           <span key={idx} className="badge badge-neutral" style={{ fontSize: '10px' }}>{t}</span>
                         ))}
+                        {bm.size && bm.size !== '未知' && (
+                          <span className="badge badge-primary" style={{ fontSize: '10px' }}>{bm.size}</span>
+                        )}
                       </div>
 
                       {isDownloaded ? (
@@ -408,6 +411,9 @@ export default function DownloadTab({
                     }}>
                       <div>Repo: <span style={{ color: '#38bdf8' }}>{bm.repoId}</span></div>
                       <div>File: <span style={{ color: '#a855f7' }}>{bm.filename}</span></div>
+                      {bm.size && (
+                        <div style={{ marginTop: '3px' }}>Size: <span style={{ color: '#34d399' }}>{bm.size}</span></div>
+                      )}
                     </div>
                   </div>
 
