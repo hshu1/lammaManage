@@ -1,0 +1,118 @@
+{
+  "executablePath": "D:\\99_lamma\\lamma\\llama-b9994-bin-win-cuda-13.3-x64\\llama-server.exe",
+  "modelsPath": "D:\\99_lamma\\models",
+  "defaultHost": "127.0.0.1",
+  "defaultPort": 8080,
+  "hfMirror": "https://hf-mirror.com",
+  "hfToken": "",
+  "activeModel": "Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf",
+  "launchParams": {
+    "nGpuLayers": 99,
+    "ctxSize": 65536,
+    "threads": 8,
+    "parallel": 1,
+    "flashAttn": true,
+    "cacheTypeK": "q4_0",
+    "cacheTypeV": "q4_0",
+    "mcpProxy": false,
+    "extraArgs": ""
+  },
+  "presets": [
+    {
+      "id": "daily",
+      "name": "日常轻量推荐 (8K 上下文)",
+      "desc": "适合日常代码问答、日常对话，显存占用极低，极速响应",
+      "params": {
+        "nGpuLayers": 99,
+        "ctxSize": 8000,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": false,
+        "cacheTypeK": "f16",
+        "cacheTypeV": "f16",
+        "mcpProxy": false,
+        "extraArgs": ""
+      }
+    },
+    {
+      "id": "plan_a",
+      "name": "方案 A: 高频长对话/代码重构 (32K)",
+      "desc": "启用 Flash Attention 与 Q4 KV Cache 压缩，最高 32k tokens 长文本处理",
+      "params": {
+        "nGpuLayers": 99,
+        "ctxSize": 32768,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": true,
+        "cacheTypeK": "q4_0",
+        "cacheTypeV": "q4_0",
+        "mcpProxy": false,
+        "extraArgs": ""
+      }
+    },
+    {
+      "id": "plan_b",
+      "name": "方案 B: CPU+GPU 混合极限 (64K~128K)",
+      "desc": "显存有限时分流到 CPU 内存，突破显存上限，支持超长文本检索",
+      "params": {
+        "nGpuLayers": 28,
+        "ctxSize": 65536,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": true,
+        "cacheTypeK": "q4_0",
+        "cacheTypeV": "q4_0",
+        "mcpProxy": false,
+        "extraArgs": ""
+      }
+    },
+    {
+      "id": "plan_c",
+      "name": "方案 C: 纯 GPU 顶配加速 (64K)",
+      "desc": "大显存 GPU 全层卸载 + Flash Attention + Q4 KV Cache，极速长上下文推理",
+      "params": {
+        "nGpuLayers": 99,
+        "ctxSize": 65536,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": true,
+        "cacheTypeK": "q4_0",
+        "cacheTypeV": "q4_0",
+        "mcpProxy": false,
+        "extraArgs": ""
+      }
+    },
+    {
+      "id": "plan_d",
+      "name": "方案 D: 极高注意力精度 (32K)",
+      "desc": "采用 Q8_0 KV Cache，保留极高注意力精度，适合高精度数学与代码逻辑推理",
+      "params": {
+        "nGpuLayers": 99,
+        "ctxSize": 32768,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": true,
+        "cacheTypeK": "q8_0",
+        "cacheTypeV": "q8_0",
+        "mcpProxy": false,
+        "extraArgs": ""
+      }
+    },
+    {
+      "id": "plan_d_plus",
+      "name": "方案 D+: 高精度 + MCP 代理 (32K)",
+      "desc": "高精度 32K 模式，并开启 --webui-mcp-proxy 代理支持",
+      "params": {
+        "nGpuLayers": 99,
+        "ctxSize": 32768,
+        "threads": 8,
+        "parallel": 1,
+        "flashAttn": true,
+        "cacheTypeK": "q8_0",
+        "cacheTypeV": "q8_0",
+        "mcpProxy": true,
+        "extraArgs": "--webui-mcp-proxy"
+      }
+    }
+  ]
+}

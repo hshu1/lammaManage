@@ -1,0 +1,306 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Settings, 
+  Save, 
+  CheckCircle2, 
+  AlertCircle, 
+  FolderOpen, 
+  Terminal, 
+  Code, 
+  Copy, 
+  ExternalLink,
+  ShieldCheck,
+  Globe
+} from 'lucide-react';
+
+export default function SettingsTab({
+  config,
+  onSaveConfig,
+  onOpenFolder,
+  addToast
+}) {
+  const [formData, setFormData] = useState({
+    executablePath: '',
+    modelsPath: '',
+    defaultHost: '127.0.0.1',
+    defaultPort: 8080,
+    hfMirror: 'https://hf-mirror.com',
+    hfToken: ''
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [activeCodeTab, setActiveCodeTab] = useState('python');
+
+  useEffect(() => {
+    if (config) {
+      setFormData({
+        executablePath: config.executablePath || '',
+        modelsPath: config.modelsPath || '',
+        defaultHost: config.defaultHost || '127.0.0.1',
+        defaultPort: config.defaultPort || 8080,
+        hfMirror: config.hfMirror || 'https://hf-mirror.com',
+        hfToken: config.hfToken || ''
+      });
+    }
+  }, [config]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSaveConfig(formData);
+      addToast?.({ type: 'success', title: '保存成功', message: '系统设置与路径配置已成功持久化' });
+    } catch (err) {
+      addToast?.({ type: 'error', title: '保存失败', message: err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copyCode = (text) => {
+    navigator.clipboard.writeText(text);
+    addToast?.({ type: 'success', title: '已复制', message: '代码示例已复制到剪贴板' });
+  };
+
+  const currentEndpoint = `http://${formData.defaultHost || '127.0.0.1'}:${formData.defaultPort || 8080}`;
+
+  const pythonSnippet = `from openai import OpenAI
+
+# 连接本地已启动的 Llama.cpp 服务
+client = OpenAI(
+    base_url="${currentEndpoint}/v1",
+    api_key="no-key-required"  # 本地服务默认无需 Key
+)
+
+response = client.chat.completions.create(
+    model="default",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "你好！请写一段快速排序的 Python 实现。"}
+    ],
+    temperature=0.7,
+    stream=True
+)
+
+for chunk in response:
+    content = chunk.choices[0].delta.content or ""
+    print(content, end="", flush=True)
+`;
+
+  const curlSnippet = `curl ${currentEndpoint}/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "messages": [{"role": "user", "content": "你好，请做个自我介绍"}],
+    "temperature": 0.7
+  }'`;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* 路径与网络核心配置 */}
+      <div className="glass-panel" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+          <Settings size={22} style={{ color: '#38bdf8' }} />
+          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+          {/* 可执行文件路径 */}
+          <div>
+            <label className="input-label">
+              llama-server.exe 可执行文件完整绝对路径:
+            </label>
+            <input
+              type="text"
+              value={formData.executablePath}
+              onChange={(e) => setFormData({ ...formData, executablePath: e.target.value })}
+              className="input-text"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}
+              placeholder="例如: D:\99_lamma\lamma\llama-b9994-bin-win-cuda-13.3-x64\llama-server.exe"
+            />
+          </div>
+
+          {/* 模型存放目录 */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="input-label" style={{ margin: 0 }}>
+                本地 GGUF 模型存储目录 (扫描与下载存放路径):
+              </label>
+              <button
+                type="button"
+                onClick={() => onOpenFolder(formData.modelsPath)}
+                className="btn btn-ghost"
+                style={{ fontSize: '12px', padding: '2px 6px', color: '#38bdf8' }}
+              >
+                <FolderOpen size={13} />
+                打开该目录
+              </button>
+            </div>
+            <input
+              type="text"
+              value={formData.modelsPath}
+              onChange={(e) => setFormData({ ...formData, modelsPath: e.target.value })}
+              className="input-text"
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '13px' }}
+              placeholder="例如: D:\99_lamma\models"
+            />
+          </div>
+
+          {/* 监听 Host 与 Port */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px'
+          }}>
+            <div>
+              <label className="input-label">默认服务监听 Host:</label>
+              <select
+                value={formData.defaultHost}
+                onChange={(e) => setFormData({ ...formData, defaultHost: e.target.value })}
+                className="input-select"
+              >
+                <option value="127.0.0.1">127.0.0.1 (仅允许本机访问，安全)</option>
+                <option value="0.0.0.0">0.0.0.0 (允许局域网其他设备访问)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="input-label">默认服务监听端口 (Port):</label>
+              <input
+                type="number"
+                value={formData.defaultPort}
+                onChange={(e) => setFormData({ ...formData, defaultPort: parseInt(e.target.value, 10) || 8080 })}
+                className="input-text"
+              />
+            </div>
+          </div>
+
+          {/* HuggingFace 镜像源与 Token */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '16px',
+            paddingTop: '10px',
+            borderTop: '1px solid rgba(255,255,255,0.06)'
+          }}>
+            <div>
+              <label className="input-label">HuggingFace 默认下载源 / 镜像端点:</label>
+              <input
+                type="text"
+                value={formData.hfMirror}
+                onChange={(e) => setFormData({ ...formData, hfMirror: e.target.value })}
+                className="input-text"
+                placeholder="https://hf-mirror.com"
+              />
+            </div>
+
+            <div>
+              <label className="input-label">HF Access Token (访问私有/受限模型选填):</label>
+              <input
+                type="password"
+                value={formData.hfToken}
+                onChange={(e) => setFormData({ ...formData, hfToken: e.target.value })}
+                className="input-text"
+                placeholder="hf_..."
+              />
+            </div>
+          </div>
+
+          {/* 提交保存 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+            <button type="submit" disabled={saving} className="btn btn-primary" style={{ padding: '10px 24px' }}>
+              <Save size={16} />
+              {saving ? '正在保存...' : '保存配置'}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* 接口文档与第三方客户端对接指南 */}
+      <div className="glass-panel" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <Globe size={22} style={{ color: '#a855f7' }} />
+          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>OpenAI 兼容 API 接入与第三方客户端配置</h2>
+        </div>
+
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
+          Llama.cpp 服务启动后，全面原生兼容 OpenAI 标准接口协议。无论是 Python、Node.js 还是各大常用大模型桌面客户端（如 Cherry Studio、NextChat、Chatbox、Open-WebUI、Dify 等）均可无缝直接接入。
+        </p>
+
+        {/* 常用客户端配置卡片 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '12px',
+          marginBottom: '20px'
+        }}>
+          <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#38bdf8', marginBottom: '6px' }}>
+              Cherry Studio / Chatbox
+            </div>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              <div>• 提供商选择: <strong>OpenAI 兼容 / 自定义</strong></div>
+              <div>• API Base URL: <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}/v1</strong></div>
+              <div>• API Key: <strong>任意填写 (如 123)</strong></div>
+            </div>
+          </div>
+
+          <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: '#a855f7', marginBottom: '6px' }}>
+              NextChat (ChatGPT-Next-Web)
+            </div>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+              <div>• 接口地址: <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}</strong></div>
+              <div>• 模型名称: <strong>输入当前运行的模型名称</strong></div>
+              <div>• API Key: <strong>空或任意值</strong></div>
+            </div>
+          </div>
+        </div>
+
+        {/* 代码示例切换 */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setActiveCodeTab('python')}
+                className={`btn ${activeCodeTab === 'python' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                Python (OpenAI SDK)
+              </button>
+              <button
+                onClick={() => setActiveCodeTab('curl')}
+                className={`btn ${activeCodeTab === 'curl' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{ padding: '4px 12px', fontSize: '12px' }}
+              >
+                cURL 命令行
+              </button>
+            </div>
+
+            <button
+              onClick={() => copyCode(activeCodeTab === 'python' ? pythonSnippet : curlSnippet)}
+              className="btn btn-ghost"
+              style={{ fontSize: '12px' }}
+            >
+              <Copy size={13} />
+              复制代码
+            </button>
+          </div>
+
+          <pre style={{
+            background: 'rgba(5, 8, 15, 0.95)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '10px',
+            padding: '14px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '12.5px',
+            color: '#e2e8f0',
+            overflowX: 'auto',
+            lineHeight: '1.5'
+          }}>
+            <code>{activeCodeTab === 'python' ? pythonSnippet : curlSnippet}</code>
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
