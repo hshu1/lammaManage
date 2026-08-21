@@ -5,16 +5,16 @@
   "defaultPort": 8080,
   "hfMirror": "https://hf-mirror.com",
   "hfToken": "",
-  "activeModel": "Qwen3.8-9B-Q4_K_M.gguf",
+  "activeModel": "qwen3.8-9b-heretic-uncensored-q5_0.gguf",
   "launchParams": {
     "nGpuLayers": 99,
-    "ctxSize": 65536,
+    "ctxSize": 32768,
     "threads": 8,
     "parallel": 1,
     "flashAttn": true,
-    "cacheTypeK": "q4_0",
-    "cacheTypeV": "q4_0",
-    "mcpProxy": false,
+    "cacheTypeK": "q8_0",
+    "cacheTypeV": "q8_0",
+    "mcpProxy": true,
     "extraArgs": ""
   },
   "presets": [
