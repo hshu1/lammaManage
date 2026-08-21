@@ -8,10 +8,17 @@ import {
   Terminal, 
   Code, 
   Copy, 
-  ExternalLink,
-  ShieldCheck,
-  Globe
+  ExternalLink, 
+  ShieldCheck, 
+  Globe,
+  Sparkles,
+  RefreshCw,
+  FolderSearch,
+  FileCode,
+  HardDrive
 } from 'lucide-react';
+import { api } from '../api/client.js';
+import FileBrowserModal from './FileBrowserModal.jsx';
 
 export default function SettingsTab({
   config,
@@ -29,7 +36,18 @@ export default function SettingsTab({
   });
 
   const [saving, setSaving] = useState(false);
+  const [detecting, setDetecting] = useState(false);
   const [activeCodeTab, setActiveCodeTab] = useState('python');
+
+  // 文件/目录树浏览弹窗状态
+  const [browserModal, setBrowserModal] = useState({
+    isOpen: false,
+    mode: 'folder',
+    title: '',
+    initialPath: '',
+    filterExt: '',
+    targetField: ''
+  });
 
   useEffect(() => {
     if (config) {
@@ -43,6 +61,137 @@ export default function SettingsTab({
       });
     }
   }, [config]);
+
+  // 选择 llama-server.exe 文件
+  const handleSelectExecutable = async () => {
+    try {
+      const res = await api.selectFile({
+        title: '选择 llama-server.exe 可执行文件',
+        filter: '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*'
+      });
+      if (res.success && res.path) {
+        setFormData(prev => ({ ...prev, executablePath: res.path }));
+        addToast?.({ type: 'success', title: '已选择文件', message: res.path });
+      } else if (res.error) {
+        // 若原生系统弹窗受限，自动弹出内置可视化目录选择器
+        setBrowserModal({
+          isOpen: true,
+          mode: 'file',
+          title: '浏览选择 llama-server.exe 文件',
+          initialPath: formData.executablePath || '',
+          filterExt: '.exe',
+          targetField: 'executablePath'
+        });
+      }
+    } catch (e) {
+      setBrowserModal({
+        isOpen: true,
+        mode: 'file',
+        title: '浏览选择 llama-server.exe 文件',
+        initialPath: formData.executablePath || '',
+        filterExt: '.exe',
+        targetField: 'executablePath'
+      });
+    }
+  };
+
+  // 选择 models 模型存储目录
+  const handleSelectModelsFolder = async () => {
+    try {
+      const res = await api.selectFolder({
+        title: '选择本地 GGUF 模型存储目录'
+      });
+      if (res.success && res.path) {
+        setFormData(prev => ({ ...prev, modelsPath: res.path }));
+        addToast?.({ type: 'success', title: '已选择模型目录', message: res.path });
+      } else if (res.error) {
+        setBrowserModal({
+          isOpen: true,
+          mode: 'folder',
+          title: '浏览选择本地 GGUF 模型存储目录',
+          initialPath: formData.modelsPath || '',
+          filterExt: '',
+          targetField: 'modelsPath'
+        });
+      }
+    } catch (e) {
+      setBrowserModal({
+        isOpen: true,
+        mode: 'folder',
+        title: '浏览选择本地 GGUF 模型存储目录',
+        initialPath: formData.modelsPath || '',
+        filterExt: '',
+        targetField: 'modelsPath'
+      });
+    }
+  };
+
+  const handleAutoDetect = async () => {
+    setDetecting(true);
+    try {
+      let res;
+      try {
+        res = await api.detectPaths();
+      } catch (e1) {
+        const configRes = await api.getConfig();
+        if (configRes.success && configRes.detected) {
+          res = configRes;
+        } else if (configRes.success && configRes.config) {
+          res = {
+            success: true,
+            detected: {
+              executablePath: configRes.config.executablePath,
+              modelsPath: configRes.config.modelsPath
+            },
+            validation: configRes.validation
+          };
+        } else {
+          throw e1;
+        }
+      }
+
+      if (res && res.success && res.detected) {
+        const { executablePath, modelsPath } = res.detected;
+        const { exeExists, modelsDirExists } = res.validation || {};
+
+        setFormData(prev => ({
+          ...prev,
+          executablePath: executablePath || prev.executablePath,
+          modelsPath: modelsPath || prev.modelsPath
+        }));
+
+        if (exeExists && modelsDirExists) {
+          addToast?.({
+            type: 'success',
+            title: '自动扫描成功',
+            message: '已成功自动识别到 llama-server 及本地模型库路径！'
+          });
+        } else if (exeExists) {
+          addToast?.({
+            type: 'info',
+            title: '扫描完成',
+            message: `已找到 llama-server (${executablePath})，未找到 models 目录`
+          });
+        } else if (modelsDirExists) {
+          addToast?.({
+            type: 'info',
+            title: '扫描完成',
+            message: `已找到模型库目录 (${modelsPath})，未找到 llama-server`
+          });
+        } else {
+          addToast?.({
+            type: 'warning',
+            title: '已生成推导路径',
+            message: '未能自动发现已存在的文件，已填入默认相对推导路径，请确认。'
+          });
+        }
+      }
+    } catch (err) {
+      addToast?.({ type: 'error', title: '扫描失败', message: err.message });
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -98,17 +247,84 @@ for chunk in response:
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* 路径与网络核心配置 */}
       <div className="glass-panel" style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <Settings size={22} style={{ color: '#38bdf8' }} />
-          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          marginBottom: '20px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Settings size={22} style={{ color: '#38bdf8' }} />
+            <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleAutoDetect}
+            disabled={detecting}
+            className="btn btn-secondary"
+            style={{
+              padding: '6px 14px',
+              fontSize: '13px',
+              color: '#38bdf8',
+              borderColor: 'rgba(56, 189, 248, 0.4)',
+              background: 'rgba(56, 189, 248, 0.08)'
+            }}
+          >
+            <Sparkles size={15} />
+            {detecting ? '正在扫描路径...' : '自动扫描路径'}
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {/* 可执行文件路径 */}
           <div>
-            <label className="input-label">
-              llama-server.exe 可执行文件完整绝对路径:
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label className="input-label" style={{ margin: 0 }}>
+                llama-server.exe 可执行文件完整路径:
+              </label>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleSelectExecutable}
+                  className="btn btn-primary"
+                  style={{ fontSize: '12px', padding: '3px 10px' }}
+                >
+                  <FolderOpen size={13} />
+                  选择文件
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrowserModal({
+                      isOpen: true,
+                      mode: 'file',
+                      title: '浏览选择 llama-server.exe 文件',
+                      initialPath: formData.executablePath || '',
+                      filterExt: '.exe',
+                      targetField: 'executablePath'
+                    });
+                  }}
+                  className="btn btn-ghost"
+                  style={{ fontSize: '12px', padding: '3px 8px', color: 'var(--text-muted)' }}
+                  title="在网页内部可视化浏览目录"
+                >
+                  <FolderSearch size={13} />
+                  树形浏览
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoDetect}
+                  className="btn btn-ghost"
+                  style={{ fontSize: '12px', padding: '3px 8px', color: '#38bdf8' }}
+                >
+                  <Sparkles size={13} />
+                  自动扫描
+                </button>
+              </div>
+            </div>
             <input
               type="text"
               value={formData.executablePath}
@@ -125,15 +341,45 @@ for chunk in response:
               <label className="input-label" style={{ margin: 0 }}>
                 本地 GGUF 模型存储目录 (扫描与下载存放路径):
               </label>
-              <button
-                type="button"
-                onClick={() => onOpenFolder(formData.modelsPath)}
-                className="btn btn-ghost"
-                style={{ fontSize: '12px', padding: '2px 6px', color: '#38bdf8' }}
-              >
-                <FolderOpen size={13} />
-                打开该目录
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={handleSelectModelsFolder}
+                  className="btn btn-primary"
+                  style={{ fontSize: '12px', padding: '3px 10px' }}
+                >
+                  <FolderOpen size={13} />
+                  选择文件夹
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBrowserModal({
+                      isOpen: true,
+                      mode: 'folder',
+                      title: '浏览选择模型存储目录',
+                      initialPath: formData.modelsPath || '',
+                      filterExt: '',
+                      targetField: 'modelsPath'
+                    });
+                  }}
+                  className="btn btn-ghost"
+                  style={{ fontSize: '12px', padding: '3px 8px', color: 'var(--text-muted)' }}
+                  title="在网页内部可视化浏览目录"
+                >
+                  <FolderSearch size={13} />
+                  树形浏览
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoDetect}
+                  className="btn btn-ghost"
+                  style={{ fontSize: '12px', padding: '3px 8px', color: '#38bdf8' }}
+                >
+                  <Sparkles size={13} />
+                  自动扫描
+                </button>
+              </div>
             </div>
             <input
               type="text"
@@ -301,6 +547,23 @@ for chunk in response:
           </pre>
         </div>
       </div>
+
+      {/* 可视化文件/文件夹树形浏览模态框 */}
+      <FileBrowserModal
+        isOpen={browserModal.isOpen}
+        onClose={() => setBrowserModal(prev => ({ ...prev, isOpen: false }))}
+        mode={browserModal.mode}
+        title={browserModal.title}
+        initialPath={browserModal.initialPath}
+        filterExt={browserModal.filterExt}
+        onSelect={(selectedPath) => {
+          if (browserModal.targetField) {
+            setFormData(prev => ({ ...prev, [browserModal.targetField]: selectedPath }));
+            addToast?.({ type: 'success', title: '已选择路径', message: selectedPath });
+          }
+        }}
+        addToast={addToast}
+      />
     </div>
   );
 }

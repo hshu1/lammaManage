@@ -219,6 +219,7 @@ export default function App() {
   const handleOpenFolder = async (folderPath) => {
     try {
       await api.openFolder(folderPath);
+      addToast({ type: 'success', title: '已打开资源管理器', message: `已为您定位并打开目录: ${folderPath || '模型存储目录'}` });
     } catch (e) {
       addToast({ type: 'error', title: '打开失败', message: e.message });
     }

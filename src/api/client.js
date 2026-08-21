@@ -9,6 +9,16 @@ async function request(path, options = {}) {
     ...options,
   });
 
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(`后端接口未响应或未重启 (${res.status})`);
+    }
+    // 如果返回了 HTML 页面，说明后端服务未启动或未重启
+    throw new Error('接口返回非 JSON 内容，请检查后端服务是否已正常启动');
+  }
+
   const data = await res.json();
   if (!res.ok) {
     throw new Error(data.error || `请求失败 (${res.status})`);
@@ -20,11 +30,15 @@ export const api = {
   // 系统配置
   getConfig: () => request('/api/config'),
   saveConfig: (config) => request('/api/config', { method: 'POST', body: JSON.stringify(config) }),
+  detectPaths: () => request('/api/config/detect-paths', { method: 'POST' }),
 
-  // 本地模型
+  // 本地模型与文件选择
   getModels: (dir) => request(`/api/models${dir ? `?dir=${encodeURIComponent(dir)}` : ''}`),
   deleteModel: (filename) => request(`/api/models/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
   openFolder: (targetPath) => request('/api/models/open-folder', { method: 'POST', body: JSON.stringify({ path: targetPath }) }),
+  selectFile: (payload) => request('/api/utils/select-file', { method: 'POST', body: JSON.stringify(payload) }),
+  selectFolder: (payload) => request('/api/utils/select-folder', { method: 'POST', body: JSON.stringify(payload) }),
+  browsePath: (path) => request('/api/utils/browse-path', { method: 'POST', body: JSON.stringify({ path }) }),
 
   // 服务控制
   getServerStatus: () => request('/api/server/status'),

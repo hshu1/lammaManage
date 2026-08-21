@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Trash2, Sparkles, Zap, RefreshCw, AlertCircle } from 'lucide-react';
+import { Send, Bot, User, Trash2, Sparkles, Zap, RefreshCw, AlertCircle, Square } from 'lucide-react';
 
 export default function ChatPlayground({ serverStatus, addToast }) {
   const isRunning = serverStatus?.status === 'RUNNING';
@@ -12,9 +12,9 @@ export default function ChatPlayground({ serverStatus, addToast }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
-  const [maxTokens, setMaxTokens] = useState(1024);
-  const [stats, setStats] = useState(null); // { latency: '120ms', tokens: 45 }
+  const [stats, setStats] = useState(null); // { latency: '120ms', totalTime: '2.5s' }
   const messagesEndRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -26,6 +26,15 @@ export default function ChatPlayground({ serverStatus, addToast }) {
     '用通俗易懂的语言解释什么是 KV Cache 压缩？',
     '写一首关于 GPU 算力与人工智能的现代诗'
   ];
+
+  const handleStopGenerating = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setLoading(false);
+      addToast?.({ type: 'info', title: '已停止生成', message: '已手动停止模型后续输出' });
+    }
+  };
 
   const handleSend = async (customPrompt) => {
     const textToSend = customPrompt || input;
@@ -44,32 +53,61 @@ export default function ChatPlayground({ serverStatus, addToast }) {
     setStats(null);
 
     const startTime = Date.now();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // 直接调用当前已启动服务的原生 /v1/chat/completions 接口（支持跨域直连）
+    const targetUrl = serverStatus?.endpoint 
+      ? `${serverStatus.endpoint}/v1/chat/completions` 
+      : `http://${serverStatus?.host || '127.0.0.1'}:${serverStatus?.port || 8080}/v1/chat/completions`;
 
     try {
       // 创建一个空的 assistant 消息
       const assistantMsg = { role: 'assistant', content: '' };
       setMessages([...newMessages, assistantMsg]);
 
-      const response = await fetch('/api/test-chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          temperature,
-          max_tokens: maxTokens,
-          stream: true
-        })
-      });
+      let response;
+      try {
+        // 优先直连已启动服务的原生接口
+        response = await fetch(targetUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: abortController.signal,
+          body: JSON.stringify({
+            messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+            temperature,
+            stream: true
+          })
+        });
+      } catch (directErr) {
+        // 若直接跨域受限，回退走代理接口
+        if (directErr.name === 'AbortError') throw directErr;
+        response = await fetch('/api/test-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: abortController.signal,
+          body: JSON.stringify({
+            messages: newMessages.map(m => ({ role: m.role, content: m.content })),
+            temperature,
+            stream: true
+          })
+        });
+      }
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || '请求失败');
+        let errMsg = '请求失败';
+        try {
+          const errData = await response.json();
+          errMsg = errData.error || errMsg;
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let fullText = '';
       let firstTokenTime = null;
+      let sseBuffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -79,22 +117,44 @@ export default function ChatPlayground({ serverStatus, addToast }) {
           firstTokenTime = Date.now();
         }
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
+        // 持续累加至 buffer，避免 TCP 切片导致 JSON 不完整而漏字断流
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split('\n');
+        // 将未换行的末尾部分保留至下一次循环组装
+        sseBuffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace(/^data: /, '').trim();
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed.startsWith('data: ')) {
+            const dataStr = trimmed.slice(6).trim();
             if (dataStr === '[DONE]') continue;
             try {
               const parsed = JSON.parse(dataStr);
               const token = parsed.choices?.[0]?.delta?.content || '';
-              fullText += token;
-              setMessages([...newMessages, { role: 'assistant', content: fullText }]);
+              if (token) {
+                fullText += token;
+                setMessages([...newMessages, { role: 'assistant', content: fullText }]);
+              }
             } catch (e) {
-              // partial json
+              // 忽略偶尔的异常片段
             }
           }
+        }
+      }
+
+      // 如果缓冲区还有残留数据，最后尝试处理一次
+      if (sseBuffer.trim().startsWith('data: ')) {
+        const dataStr = sseBuffer.trim().slice(6).trim();
+        if (dataStr && dataStr !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(dataStr);
+            const token = parsed.choices?.[0]?.delta?.content || '';
+            if (token) {
+              fullText += token;
+              setMessages([...newMessages, { role: 'assistant', content: fullText }]);
+            }
+          } catch (e) {}
         }
       }
 
@@ -106,11 +166,16 @@ export default function ChatPlayground({ serverStatus, addToast }) {
       });
 
     } catch (err) {
-      console.error(err);
-      setMessages([...newMessages, { role: 'assistant', content: `❌ 推断出错: ${err.message}` }]);
-      addToast?.({ type: 'error', title: '推断失败', message: err.message });
+      if (err.name === 'AbortError') {
+        // 用户主动停止，保持已有文本
+      } else {
+        console.error(err);
+        setMessages([...newMessages, { role: 'assistant', content: `❌ 推断中断: ${err.message}` }]);
+        addToast?.({ type: 'error', title: '推断中断', message: err.message });
+      }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -290,15 +355,27 @@ export default function ChatPlayground({ serverStatus, addToast }) {
           style={{ resize: 'none', fontSize: '13px', lineHeight: '1.4' }}
         />
 
-        <button
-          onClick={() => handleSend()}
-          disabled={!isRunning || !input.trim() || loading}
-          className="btn btn-primary"
-          style={{ padding: '0 20px', borderRadius: '10px' }}
-        >
-          {loading ? <RefreshCw size={16} className="spin-animation" /> : <Send size={16} />}
-          发送
-        </button>
+        {loading ? (
+          <button
+            onClick={handleStopGenerating}
+            className="btn btn-danger"
+            style={{ padding: '0 20px', borderRadius: '10px' }}
+            title="停止本次生成"
+          >
+            <Square size={16} />
+            停止
+          </button>
+        ) : (
+          <button
+            onClick={() => handleSend()}
+            disabled={!isRunning || !input.trim()}
+            className="btn btn-primary"
+            style={{ padding: '0 20px', borderRadius: '10px' }}
+          >
+            <Send size={16} />
+            发送
+          </button>
+        )}
       </div>
     </div>
   );

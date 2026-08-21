@@ -56,7 +56,8 @@ export default function DownloadTab({
         filename: parsed.filename,
         sourceUrl: inputStr.trim(),
         description: customDesc.trim() || '从 HuggingFace 导入的模型',
-        tags: ['GGUF', parsed.repoId.split('/')[0]]
+        tags: ['GGUF', parsed.repoId.split('/')[0]],
+        size: '未知'
       };
 
       await onSaveBookmark(bookmarkData);
@@ -378,8 +379,10 @@ export default function DownloadTab({
                         {(bm.tags || []).map((t, idx) => (
                           <span key={idx} className="badge badge-neutral" style={{ fontSize: '10px' }}>{t}</span>
                         ))}
-                        {bm.size && bm.size !== '未知' && (
+                        {bm.size && bm.size !== '未知' ? (
                           <span className="badge badge-primary" style={{ fontSize: '10px' }}>{bm.size}</span>
+                        ) : (
+                          <span className="badge badge-neutral" style={{ fontSize: '10px', color: 'var(--text-dim)' }}>未知大小</span>
                         )}
                       </div>
 
@@ -411,9 +414,9 @@ export default function DownloadTab({
                     }}>
                       <div>Repo: <span style={{ color: '#38bdf8' }}>{bm.repoId}</span></div>
                       <div>File: <span style={{ color: '#a855f7' }}>{bm.filename}</span></div>
-                      {bm.size && (
-                        <div style={{ marginTop: '3px' }}>Size: <span style={{ color: '#34d399' }}>{bm.size}</span></div>
-                      )}
+                      <div style={{ marginTop: '3px' }}>
+                        Size: <span style={{ color: (!bm.size || bm.size === '未知') ? 'var(--text-dim)' : '#34d399' }}>{bm.size || '未知'}</span>
+                      </div>
                     </div>
                   </div>
 

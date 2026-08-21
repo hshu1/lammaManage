@@ -5,7 +5,7 @@
   "defaultPort": 8080,
   "hfMirror": "https://hf-mirror.com",
   "hfToken": "",
-  "activeModel": "Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf",
+  "activeModel": "Qwen3.8-9B-Q4_K_M.gguf",
   "launchParams": {
     "nGpuLayers": 99,
     "ctxSize": 65536,
@@ -19,9 +19,16 @@
   },
   "presets": [
     {
-      "id": "daily",
-      "name": "日常轻量推荐 (8K 上下文)",
-      "desc": "适合日常代码问答、日常对话，显存占用极低，极速响应",
+      "id": "daily_8k",
+      "name": "日常8196 (8K 基础版)",
+      "desc": "全层 GPU 加速，8K 上下文，启动迅速，适合日常极速对话与常规问答。",
+      "tags": [
+        "日常对话",
+        "8K",
+        "纯GPU",
+        "默认精度"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 8000 --port 8080",
       "params": {
         "nGpuLayers": 99,
         "ctxSize": 8000,
@@ -35,9 +42,18 @@
       }
     },
     {
-      "id": "plan_a",
-      "name": "方案 A: 高频长对话/代码重构 (32K)",
-      "desc": "启用 Flash Attention 与 Q4 KV Cache 压缩，最高 32k tokens 长文本处理",
+      "id": "scheme_a_32k",
+      "name": "方案A: 高频长对话 / 代码重构 (32K)",
+      "desc": "适合高频长对话、大型代码重构与中长篇文档总结，开启 Flash Attention 与 Q4 KV 缓存，平衡显存与速度。",
+      "tags": [
+        "代码重构",
+        "32K",
+        "FlashAttn",
+        "Q4缓存",
+        "中长文档",
+        "纯GPU"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080",
       "params": {
         "nGpuLayers": 99,
         "ctxSize": 32768,
@@ -51,9 +67,17 @@
       }
     },
     {
-      "id": "plan_b",
-      "name": "方案 B: CPU+GPU 混合极限 (64K~128K)",
-      "desc": "显存有限时分流到 CPU 内存，突破显存上限，支持超长文本检索",
+      "id": "scheme_b_hybrid_64k",
+      "name": "方案B: CPU+GPU 混合卸载 (极限 64K~128K)",
+      "desc": "显存有限但需极限超长上下文，卸载 28 层至 GPU，剩余由 CPU 内存分担，彻底防爆显存。",
+      "tags": [
+        "混合卸载",
+        "64K",
+        "超长文本",
+        "低显存占用",
+        "CPU辅助"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 28 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 -t 8 --port 8080",
       "params": {
         "nGpuLayers": 28,
         "ctxSize": 65536,
@@ -67,9 +91,18 @@
       }
     },
     {
-      "id": "plan_c",
-      "name": "方案 C: 纯 GPU 顶配加速 (64K)",
-      "desc": "大显存 GPU 全层卸载 + Flash Attention + Q4 KV Cache，极速长上下文推理",
+      "id": "scheme_c_gpu_64k",
+      "name": "方案C: 纯 GPU 满血加速 (64K 顶配)",
+      "desc": "大显存显卡专享，全层 GPU 加速 + 64K 超长上下文 + Q4 KV 缓存，极速超长文本推理。",
+      "tags": [
+        "纯GPU",
+        "64K",
+        "超长文本",
+        "高性能",
+        "FlashAttn",
+        "Q4缓存"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080",
       "params": {
         "nGpuLayers": 99,
         "ctxSize": 65536,
@@ -83,9 +116,18 @@
       }
     },
     {
-      "id": "plan_d",
-      "name": "方案 D: 极高注意力精度 (32K)",
-      "desc": "采用 Q8_0 KV Cache，保留极高注意力精度，适合高精度数学与代码逻辑推理",
+      "id": "scheme_d_high_precision_32k",
+      "name": "方案D: 极高精度方案 (32K Q8 Cache)",
+      "desc": "32K 上下文并启用 Q8_0 高精度量化缓存与 Flash Attention，追求更高注意力精度。",
+      "tags": [
+        "高精度",
+        "32K",
+        "Q8缓存",
+        "代码重构",
+        "FlashAttn",
+        "纯GPU"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --port 8080",
       "params": {
         "nGpuLayers": 99,
         "ctxSize": 32768,
@@ -99,9 +141,19 @@
       }
     },
     {
-      "id": "plan_d_plus",
-      "name": "方案 D+: 高精度 + MCP 代理 (32K)",
-      "desc": "高精度 32K 模式，并开启 --webui-mcp-proxy 代理支持",
+      "id": "scheme_d_plus_mcp_32k",
+      "name": "方案D+: 极高精度 + MCP 智能体 (32K)",
+      "desc": "极高精度方案（32k 上下文追求更高注意力精度 + WebUI MCP 代理支持），完美适配智能体工具链。",
+      "tags": [
+        "高精度",
+        "32K",
+        "MCP智能体",
+        "WebUI扩展",
+        "Q8缓存",
+        "FlashAttn",
+        "纯GPU"
+      ],
+      "rawCommand": "./llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --webui-mcp-proxy --port 8080",
       "params": {
         "nGpuLayers": 99,
         "ctxSize": 32768,
@@ -111,7 +163,7 @@
         "cacheTypeK": "q8_0",
         "cacheTypeV": "q8_0",
         "mcpProxy": true,
-        "extraArgs": "--webui-mcp-proxy"
+        "extraArgs": ""
       }
     }
   ]

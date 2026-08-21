@@ -1,19 +1,5 @@
 [
   {
-    "id": "bm_1787024912872",
-    "name": "qwen2.5-coder-7b-instruct-q4_k_m",
-    "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
-    "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
-    "sourceUrl": "hf download hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
-    "description": "从 HuggingFace 导入的模型",
-    "tags": [
-      "GGUF",
-      "Qwen"
-    ],
-    "size": "4.36 GB",
-    "addedAt": "2026-08-18T03:48:32.872Z"
-  },
-  {
     "id": "bm_1787024890818",
     "name": "qwen2.5-coder-7b-instruct-q5_k_m",
     "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",

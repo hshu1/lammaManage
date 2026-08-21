@@ -117,26 +117,182 @@ export async function deleteModelFile(modelsDir, filename) {
 }
 
 /**
- * 在 Windows 资源管理器中高亮定位文件或打开目录
+ * 在系统资源管理器中打开目录或高亮定位文件（若目录不存在自动递归创建）
  */
-export function openInExplorer(targetPath) {
+export function openInExplorer(rawPath) {
   return new Promise((resolve, reject) => {
-    if (!fs.existsSync(targetPath)) {
-      return reject(new Error('路径不存在'));
+    if (!rawPath || typeof rawPath !== 'string') {
+      return reject(new Error('未指定有效路径'));
     }
 
-    // 如果是文件，定位选中；如果是目录，打开目录
-    const stats = fs.statSync(targetPath);
+    let target = rawPath.trim().replace(/^['"]+|['"]+$/g, '');
+    if (!path.isAbsolute(target)) {
+      target = path.resolve(process.cwd(), target);
+    }
+    target = path.normalize(target);
+
+    // 如果路径不存在且不是显式文件扩展名，自动递归创建该目录
+    if (!fs.existsSync(target)) {
+      try {
+        if (!path.extname(target)) {
+          fs.mkdirSync(target, { recursive: true });
+        } else {
+          return reject(new Error(`指定的文件不存在: ${target}`));
+        }
+      } catch (e) {
+        return reject(new Error(`路径不存在且创建失败: ${target}`));
+      }
+    }
+
+    const stats = fs.statSync(target);
     let cmd = '';
-    if (stats.isDirectory()) {
-      cmd = `explorer.exe "${targetPath}"`;
+    if (process.platform === 'win32') {
+      if (stats.isDirectory()) {
+        cmd = `explorer.exe "${target}"`;
+      } else {
+        cmd = `explorer.exe /select,"${target}"`;
+      }
+    } else if (process.platform === 'darwin') {
+      cmd = stats.isDirectory() ? `open "${target}"` : `open -R "${target}"`;
     } else {
-      cmd = `explorer.exe /select,"${targetPath}"`;
+      cmd = `xdg-open "${target}"`;
     }
 
-    exec(cmd, (err) => {
-      // explorer.exe exit code is sometimes non-zero even on success, so we resolve
-      resolve({ success: true });
+    exec(cmd, () => {
+      resolve({ success: true, path: target });
     });
   });
+}
+
+function runPowerShellPicker(script) {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') {
+      return resolve({ success: false, error: '非 Windows 环境' });
+    }
+    const encoded = Buffer.from(script, 'utf16le').toString('base64');
+    const ps = spawn('powershell.exe', ['-NoProfile', '-STA', '-EncodedCommand', encoded], {
+      windowsHide: false
+    });
+    let stdout = '';
+    let stderr = '';
+    ps.stdout.on('data', (d) => stdout += d.toString());
+    ps.stderr.on('data', (d) => stderr += d.toString());
+    ps.on('close', (code) => {
+      const selected = stdout ? stdout.trim().split(/\r?\n/).pop().trim() : '';
+      if (code === 0 && selected) {
+        resolve({ success: true, path: selected });
+      } else {
+        resolve({ success: false, cancelled: true });
+      }
+    });
+    ps.on('error', (err) => {
+      resolve({ success: false, error: err.message });
+    });
+  });
+}
+
+/**
+ * 调用 Windows 原生文件选择对话框
+ */
+export function openNativeFilePicker(title = '请选择 llama-server.exe 文件', filter = '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*') {
+  const script = `
+Add-Type -AssemblyName System.Windows.Forms
+$d = New-Object System.Windows.Forms.OpenFileDialog
+$d.Title = "${title.replace(/"/g, '`"')}"
+$d.Filter = "${filter.replace(/"/g, '`"')}"
+$d.CheckFileExists = $true
+$f = New-Object System.Windows.Forms.Form
+$f.TopMost = $true
+if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  [Console]::WriteLine($d.FileName)
+}
+`;
+  return runPowerShellPicker(script);
+}
+
+/**
+ * 调用 Windows 原生文件夹选择对话框
+ */
+export function openNativeFolderPicker(title = '请选择本地 GGUF 模型存储目录') {
+  const script = `
+Add-Type -AssemblyName System.Windows.Forms
+$d = New-Object System.Windows.Forms.FolderBrowserDialog
+$d.Description = "${title.replace(/"/g, '`"')}"
+$d.ShowNewFolderButton = $true
+$f = New-Object System.Windows.Forms.Form
+$f.TopMost = $true
+if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
+  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+  [Console]::WriteLine($d.SelectedPath)
+}
+`;
+  return runPowerShellPicker(script);
+}
+
+/**
+ * 获取本地磁盘与目录树节点信息（供前端在网页内部可视化浏览与选择）
+ */
+export async function browseFilesystem(targetPath = '') {
+  try {
+    let current = targetPath ? path.resolve(targetPath) : '';
+    
+    // 如果未提供路径或路径无效，返回盘符列表 (Windows) 或根目录
+    if (!current || !fs.existsSync(current)) {
+      if (process.platform === 'win32') {
+        const drives = ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\'].filter(d => fs.existsSync(d));
+        return {
+          success: true,
+          isRoot: true,
+          currentPath: '',
+          parentPath: '',
+          items: drives.map(d => ({ name: d, path: d, isDir: true, isDrive: true }))
+        };
+      } else {
+        current = '/';
+      }
+    }
+
+    const stat = await fs.promises.stat(current);
+    if (!stat.isDirectory()) {
+      current = path.dirname(current);
+    }
+
+    const parentPath = path.dirname(current) !== current ? path.dirname(current) : '';
+    const entries = await fs.promises.readdir(current, { withFileTypes: true });
+
+    const items = [];
+    for (const entry of entries) {
+      if (entry.name.startsWith('$') || entry.name.startsWith('System Volume') || entry.name === 'node_modules') continue;
+      const full = path.join(current, entry.name);
+      const isDir = entry.isDirectory();
+      items.push({
+        name: entry.name,
+        path: full,
+        isDir,
+        isExe: entry.name.toLowerCase().endsWith('.exe'),
+        isGguf: entry.name.toLowerCase().endsWith('.gguf')
+      });
+    }
+
+    // 目录排在前，文件排在后
+    items.sort((a, b) => {
+      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      success: true,
+      currentPath: current,
+      parentPath,
+      items
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      currentPath: targetPath,
+      items: []
+    };
+  }
 }

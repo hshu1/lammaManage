@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Play, 
   Square, 
@@ -17,11 +17,127 @@ import {
   ChevronUp, 
   Sparkles,
   Terminal,
-  MessageSquare
+  MessageSquare,
+  Filter,
+  HardDrive,
+  Gauge,
+  HelpCircle
 } from 'lucide-react';
 import LogViewer from './LogViewer.jsx';
 import ChatPlayground from './ChatPlayground.jsx';
 import { formatDuration } from '../utils/formatters.js';
+import { estimateFullContextVram } from '../utils/vramCalculator.js';
+
+const DEFAULT_PRESETS = [
+  {
+    id: 'daily_8k',
+    name: '日常8196 (8K 基础版)',
+    desc: '全层 GPU 加速，8K 上下文，启动迅速，适合日常极速对话与常规问答。',
+    tags: ['日常对话', '8K', '纯GPU', '默认精度'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 8000 --port 8080',
+    params: {
+      nGpuLayers: 99,
+      ctxSize: 8000,
+      threads: 8,
+      parallel: 1,
+      flashAttn: false,
+      cacheTypeK: 'f16',
+      cacheTypeV: 'f16',
+      mcpProxy: false,
+      extraArgs: ''
+    }
+  },
+  {
+    id: 'scheme_a_32k',
+    name: '方案A: 高频长对话 / 代码重构 (32K)',
+    desc: '适合高频长对话、大型代码重构与中长篇文档总结，开启 Flash Attention 与 Q4 KV 缓存，平衡显存与速度。',
+    tags: ['代码重构', '32K', 'FlashAttn', 'Q4缓存', '中长文档', '纯GPU'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080',
+    params: {
+      nGpuLayers: 99,
+      ctxSize: 32768,
+      threads: 8,
+      parallel: 1,
+      flashAttn: true,
+      cacheTypeK: 'q4_0',
+      cacheTypeV: 'q4_0',
+      mcpProxy: false,
+      extraArgs: ''
+    }
+  },
+  {
+    id: 'scheme_b_hybrid_64k',
+    name: '方案B: CPU+GPU 混合卸载 (极限 64K~128K)',
+    desc: '显存有限但需极限超长上下文，卸载 28 层至 GPU，剩余由 CPU 内存分担，彻底防爆显存。',
+    tags: ['混合卸载', '64K', '超长文本', '低显存占用', 'CPU辅助'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 28 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 -t 8 --port 8080',
+    params: {
+      nGpuLayers: 28,
+      ctxSize: 65536,
+      threads: 8,
+      parallel: 1,
+      flashAttn: true,
+      cacheTypeK: 'q4_0',
+      cacheTypeV: 'q4_0',
+      mcpProxy: false,
+      extraArgs: ''
+    }
+  },
+  {
+    id: 'scheme_c_gpu_64k',
+    name: '方案C: 纯 GPU 满血加速 (64K 顶配)',
+    desc: '大显存显卡专享，全层 GPU 加速 + 64K 超长上下文 + Q4 KV 缓存，极速超长文本推理。',
+    tags: ['纯GPU', '64K', '超长文本', '高性能', 'FlashAttn', 'Q4缓存'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080',
+    params: {
+      nGpuLayers: 99,
+      ctxSize: 65536,
+      threads: 8,
+      parallel: 1,
+      flashAttn: true,
+      cacheTypeK: 'q4_0',
+      cacheTypeV: 'q4_0',
+      mcpProxy: false,
+      extraArgs: ''
+    }
+  },
+  {
+    id: 'scheme_d_high_precision_32k',
+    name: '方案D: 极高精度方案 (32K Q8 Cache)',
+    desc: '32K 上下文并启用 Q8_0 高精度量化缓存与 Flash Attention，追求更高注意力精度。',
+    tags: ['高精度', '32K', 'Q8缓存', '代码重构', 'FlashAttn', '纯GPU'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --port 8080',
+    params: {
+      nGpuLayers: 99,
+      ctxSize: 32768,
+      threads: 8,
+      parallel: 1,
+      flashAttn: true,
+      cacheTypeK: 'q8_0',
+      cacheTypeV: 'q8_0',
+      mcpProxy: false,
+      extraArgs: ''
+    }
+  },
+  {
+    id: 'scheme_d_plus_mcp_32k',
+    name: '方案D+: 极高精度 + MCP 智能体 (32K)',
+    desc: '极高精度方案（32k 上下文追求更高注意力精度 + WebUI MCP 代理支持），完美适配智能体工具链。',
+    tags: ['高精度', '32K', 'MCP智能体', 'WebUI扩展', 'Q8缓存', 'FlashAttn', '纯GPU'],
+    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --webui-mcp-proxy --port 8080',
+    params: {
+      nGpuLayers: 99,
+      ctxSize: 32768,
+      threads: 8,
+      parallel: 1,
+      flashAttn: true,
+      cacheTypeK: 'q8_0',
+      cacheTypeV: 'q8_0',
+      mcpProxy: true,
+      extraArgs: ''
+    }
+  }
+];
 
 export default function DashboardTab({
   config,
@@ -40,11 +156,17 @@ export default function DashboardTab({
   const isStopping = serverStatus?.status === 'STOPPING';
   const isBusy = isStarting || isStopping;
 
+  const presetList = (config?.presets && config.presets.length > 0) ? config.presets : DEFAULT_PRESETS;
+
   // 选中的模型
   const [selectedModel, setSelectedModel] = useState(config?.activeModel || (models[0]?.filename || ''));
 
   // 选中的预设 ID
-  const [selectedPresetId, setSelectedPresetId] = useState('daily');
+  const [selectedPresetId, setSelectedPresetId] = useState('daily_8k');
+
+  // 筛选下拉框状态：仅保留 ctx 上下文和总内存/显存占用
+  const [ctxFilter, setCtxFilter] = useState('all');
+  const [vramFilter, setVramFilter] = useState('all');
 
   // 当前细化参数
   const [params, setParams] = useState({
@@ -58,6 +180,46 @@ export default function DashboardTab({
     mcpProxy: false,
     extraArgs: ''
   });
+
+  // 获取当前选中的模型对象
+  const currentModelObj = useMemo(() => {
+    return models.find(m => m.filename === selectedModel) || null;
+  }, [models, selectedModel]);
+
+  // 根据 CTX 下拉框与 显存/内存占用下拉框 进行双重过滤
+  const filteredPresets = useMemo(() => {
+    return presetList.filter((preset) => {
+      // 1. CTX 上下文大小筛选
+      if (ctxFilter !== 'all') {
+        const targetCtx = parseInt(ctxFilter, 10);
+        if (preset.params.ctxSize !== targetCtx) return false;
+      }
+
+      // 2. 满上下文显存/内存占用范围筛选
+      if (vramFilter !== 'all') {
+        const vramEst = estimateFullContextVram({
+          modelSizeBytes: currentModelObj?.size || 0,
+          ...preset.params
+        });
+        const vramNum = vramEst.totalVramNumber;
+
+        if (vramFilter === 'low' && vramNum > 8.0) return false;
+        if (vramFilter === 'medium' && (vramNum <= 8.0 || vramNum > 10.0)) return false;
+        if (vramFilter === 'high' && vramNum <= 10.0) return false;
+        if (vramFilter === 'hybrid' && !vramEst.isPartialOffload) return false;
+      }
+
+      return true;
+    });
+  }, [presetList, ctxFilter, vramFilter, currentModelObj]);
+
+  // 当前参数下满上下文显存占用估算
+  const currentParamsVram = useMemo(() => {
+    return estimateFullContextVram({
+      modelSizeBytes: currentModelObj?.size || 0,
+      ...params
+    });
+  }, [currentModelObj, params]);
 
   // 高级参数面板折叠状态
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -316,53 +478,223 @@ export default function DashboardTab({
           )}
         </div>
 
-        {/* 2. 预设方案选择卡片网格 */}
-        <div style={{ marginBottom: '20px' }}>
-          <label className="input-label">一键预设方案选择:</label>
+        {/* 2. 预设方案选择卡片网格与下拉框双维度筛选 */}
+        <div style={{ marginBottom: '24px' }}>
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: '12px'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            marginBottom: '14px'
           }}>
-            {(config.presets || []).map((preset) => {
-              const isSelected = selectedPresetId === preset.id;
-              return (
-                <div
-                  key={preset.id}
-                  onClick={() => !isRunning && handleApplyPreset(preset)}
-                  className={`glass-panel glass-panel-hover`}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Filter size={16} style={{ color: '#38bdf8' }} />
+              <label className="input-label" style={{ margin: 0, fontWeight: 700 }}>
+                一键预设方案选择:
+              </label>
+            </div>
+
+            {/* 仅保留 CTX 和 总显存/内存占用 两个下拉框 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {/* CTX 筛选下拉框 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>上下文 CTX:</span>
+                <select
+                  value={ctxFilter}
+                  onChange={(e) => setCtxFilter(e.target.value)}
+                  className="input-select"
                   style={{
-                    padding: '14px',
-                    cursor: isRunning ? 'not-allowed' : 'pointer',
-                    opacity: isRunning ? 0.7 : 1,
-                    background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(15, 23, 42, 0.6)',
-                    borderColor: isSelected ? '#38bdf8' : 'var(--border-color)',
-                    boxShadow: isSelected ? '0 0 15px rgba(56, 189, 248, 0.2)' : 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    fontSize: '12px',
+                    padding: '4px 10px',
+                    width: 'auto',
+                    minWidth: '120px',
+                    background: 'rgba(15, 23, 42, 0.9)'
                   }}
                 >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                      <span style={{ fontWeight: 700, fontSize: '13px', color: isSelected ? '#38bdf8' : '#f8fafc' }}>
-                        {preset.name}
-                      </span>
-                      {isSelected && <CheckCircle2 size={15} style={{ color: '#38bdf8' }} />}
+                  <option value="all">全部上下文</option>
+                  <option value="8000">8K (8,000)</option>
+                  <option value="32768">32K (32,768)</option>
+                  <option value="65536">64K (65,536)</option>
+                </select>
+              </div>
+
+              {/* 显存/内存占用 筛选下拉框 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>总显存/内存占用:</span>
+                <select
+                  value={vramFilter}
+                  onChange={(e) => setVramFilter(e.target.value)}
+                  className="input-select"
+                  style={{
+                    fontSize: '12px',
+                    padding: '4px 10px',
+                    width: 'auto',
+                    minWidth: '145px',
+                    background: 'rgba(15, 23, 42, 0.9)'
+                  }}
+                >
+                  <option value="all">全部占用范围</option>
+                  <option value="low">轻量 (≤ 8.0 GB)</option>
+                  <option value="medium">适中 (8.1 ~ 10.0 GB)</option>
+                  <option value="high">满载高配 (&gt; 10.0 GB)</option>
+                  <option value="hybrid">CPU 混合卸载</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* 预设卡片网格 */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '12px'
+          }}>
+            {filteredPresets.length === 0 ? (
+              <div style={{
+                gridColumn: '1 / -1',
+                padding: '24px',
+                textAlign: 'center',
+                color: 'var(--text-muted)',
+                background: 'rgba(15, 23, 42, 0.4)',
+                borderRadius: '10px',
+                border: '1px dashed var(--border-color)',
+                fontSize: '13px'
+              }}>
+                没有匹配当前所选「上下文」或「显存占用」条件的预设方案，请尝试重置筛选下拉框
+              </div>
+            ) : (
+              filteredPresets.map((preset) => {
+                const isSelected = selectedPresetId === preset.id;
+                const vramEst = estimateFullContextVram({
+                  modelSizeBytes: currentModelObj?.size || 0,
+                  ...preset.params
+                });
+
+                return (
+                  <div
+                    key={preset.id}
+                    onClick={() => !isRunning && handleApplyPreset(preset)}
+                    className={`glass-panel glass-panel-hover`}
+                    style={{
+                      padding: '14px',
+                      cursor: isRunning ? 'not-allowed' : 'pointer',
+                      opacity: isRunning ? 0.7 : 1,
+                      background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(15, 23, 42, 0.6)',
+                      borderColor: isSelected ? '#38bdf8' : 'var(--border-color)',
+                      boxShadow: isSelected ? '0 0 15px rgba(56, 189, 248, 0.2)' : 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13.5px', color: isSelected ? '#38bdf8' : '#f8fafc' }}>
+                          {preset.name}
+                        </span>
+                        {isSelected && <CheckCircle2 size={16} style={{ color: '#38bdf8' }} />}
+                      </div>
+
+                      <p style={{ fontSize: '11.5px', color: 'var(--text-dim)', lineHeight: '1.4', marginBottom: '12px' }}>
+                        {preset.desc}
+                      </p>
                     </div>
-                    <p style={{ fontSize: '11.5px', color: 'var(--text-dim)', lineHeight: '1.4', marginBottom: '10px' }}>
-                      {preset.desc}
-                    </p>
+
+                    <div>
+                      {/* 参数徽章 */}
+                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                        <span className="badge badge-primary" style={{ fontSize: '10px' }}>Ctx: {preset.params.ctxSize}</span>
+                        <span className="badge badge-purple" style={{ fontSize: '10px' }}>GPU: {preset.params.nGpuLayers}层</span>
+                        <span className="badge badge-neutral" style={{ fontSize: '10px' }}>KV: {preset.params.cacheTypeK}</span>
+                        {preset.params.flashAttn && <span className="badge badge-emerald" style={{ fontSize: '10px' }}>FA</span>}
+                        {preset.params.mcpProxy && <span className="badge badge-amber" style={{ fontSize: '10px' }}>MCP</span>}
+                      </div>
+
+                      {/* 满上下文预估显存量 */}
+                      <div style={{
+                        marginTop: '8px',
+                        paddingTop: '8px',
+                        borderTop: '1px dashed rgba(255,255,255,0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-dim)' }}>满上下文预估显存:</span>
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: 800,
+                          color: vramEst.totalVramNumber > 11 ? '#c084fc' : vramEst.totalVramNumber > 8 ? '#38bdf8' : '#34d399',
+                          background: 'rgba(0,0,0,0.35)',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          🔥 ~{vramEst.totalVram} GB {vramEst.isPartialOffload ? `(+${vramEst.systemRam}G内存)` : ''}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    <span className="badge badge-primary" style={{ fontSize: '10px' }}>Ctx: {preset.params.ctxSize}</span>
-                    <span className="badge badge-purple" style={{ fontSize: '10px' }}>GPU: {preset.params.nGpuLayers}</span>
-                    {preset.params.flashAttn && <span className="badge badge-emerald" style={{ fontSize: '10px' }}>FA</span>}
-                    {preset.params.mcpProxy && <span className="badge badge-amber" style={{ fontSize: '10px' }}>MCP</span>}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* 满上下文显存即时预算分析条 */}
+        <div style={{
+          marginBottom: '20px',
+          padding: '12px 16px',
+          borderRadius: '10px',
+          background: 'rgba(15, 23, 42, 0.8)',
+          border: '1px solid rgba(56, 189, 248, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Gauge size={18} style={{ color: '#38bdf8' }} />
+            <div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#f8fafc' }}>
+                当前启动参数 · 满上下文峰值资源预算:
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>
+                模型权重: <strong style={{ color: '#cbd5e1' }}>~{currentParamsVram.modelWeightVram} GB</strong> · 
+                KV缓存: <strong style={{ color: '#cbd5e1' }}>~{currentParamsVram.kvCacheVram} GB</strong> · 
+                CUDA/运行时: <strong style={{ color: '#cbd5e1' }}>~{currentParamsVram.overheadVram} GB</strong>
+                {currentParamsVram.isPartialOffload && (
+                  <span> · CPU内存: <strong style={{ color: '#fbbf24' }}>~{currentParamsVram.systemRam} GB</strong></span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>预估满载显存:</span>
+            <span className="badge" style={{
+              fontSize: '13px',
+              fontWeight: 800,
+              padding: '4px 12px',
+              background: currentParamsVram.totalVramNumber > 11 
+                ? 'rgba(168, 85, 247, 0.2)' 
+                : currentParamsVram.totalVramNumber > 8 
+                ? 'rgba(56, 189, 248, 0.2)' 
+                : 'rgba(16, 185, 129, 0.2)',
+              color: currentParamsVram.totalVramNumber > 11 
+                ? '#c084fc' 
+                : currentParamsVram.totalVramNumber > 8 
+                ? '#38bdf8' 
+                : '#34d399',
+              borderColor: currentParamsVram.totalVramNumber > 11 
+                ? 'rgba(168, 85, 247, 0.4)' 
+                : currentParamsVram.totalVramNumber > 8 
+                ? 'rgba(56, 189, 248, 0.4)' 
+                : 'rgba(16, 185, 129, 0.4)'
+            }}>
+              🔥 ~{currentParamsVram.totalVram} GB
+            </span>
           </div>
         </div>
 

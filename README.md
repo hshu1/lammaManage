@@ -74,13 +74,13 @@ start.bat
 # 1. 进入项目目录
 cd D:\99_lamma\lammaManage
 
-# 2. 启动全栈发行服务（后台 API + dist 静态前端）
-npm start
-# 浏览器访问: http://127.0.0.1:5175
-
-# 或者启动前端 Vite 热更新开发模式：
+# 2. 前后端联合开发模式（同时启动 5175 后台 API 与 5173 前端 Vite 热更新）：
 npm run dev
 # 浏览器访问: http://localhost:5173
+
+# 3. 生产/单端口模式（启动 5175 后端 API 并托管 dist 静态前端）：
+npm start
+# 浏览器访问: http://127.0.0.1:5175
 ```
 
 ---

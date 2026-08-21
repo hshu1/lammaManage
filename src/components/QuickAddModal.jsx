@@ -31,7 +31,8 @@ export default function QuickAddModal({
         filename: parsed.filename,
         sourceUrl: inputStr.trim(),
         description: '从快捷弹窗导入的模型',
-        tags: ['GGUF', parsed.repoId.split('/')[0]]
+        tags: ['GGUF', parsed.repoId.split('/')[0]],
+        size: '未知'
       };
 
       await onSaveBookmark(bookmarkData);
