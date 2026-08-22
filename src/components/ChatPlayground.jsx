@@ -12,7 +12,7 @@ export default function ChatPlayground({ serverStatus, addToast }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [temperature, setTemperature] = useState(0.7);
-  const [stats, setStats] = useState(null); // { latency: '120ms', totalTime: '2.5s' }
+  const [stats, setStats] = useState(null); // { ttft: '120 ms', totalTime: '2.5 s' }
   const messagesEndRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -202,8 +202,8 @@ export default function ChatPlayground({ serverStatus, addToast }) {
         gap: '10px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Sparkles size={18} style={{ color: '#a855f7' }} />
-          <span style={{ fontWeight: 700, fontSize: '14px', color: '#f8fafc' }}>
+          <Sparkles size={18} style={{ color: 'var(--c-llama-sky)' }} />
+          <span style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-main)' }}>
             快速推断对话 Playground
           </span>
           {isRunning ? (
@@ -218,7 +218,7 @@ export default function ChatPlayground({ serverStatus, addToast }) {
           {stats && (
             <div style={{ display: 'flex', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
               <span className="badge badge-primary">TTFT: {stats.ttft}</span>
-              <span className="badge badge-purple">耗时: {stats.totalTime}</span>
+              <span className="badge badge-emerald">耗时: {stats.totalTime}</span>
             </div>
           )}
 
@@ -274,22 +274,25 @@ export default function ChatPlayground({ serverStatus, addToast }) {
                 width: '32px',
                 height: '32px',
                 borderRadius: '8px',
-                background: isUser ? 'linear-gradient(135deg, #0284c7, #38bdf8)' : 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                background: isUser 
+                  ? 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)' 
+                  : 'linear-gradient(135deg, var(--c-surface-dark) 0%, var(--c-border-slate) 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                flexShrink: 0
+                flexShrink: 0,
+                color: '#ffffff'
               }}>
-                {isUser ? <User size={16} color="#fff" /> : <Bot size={16} color="#fff" />}
+                {isUser ? <User size={16} /> : <Bot size={16} />}
               </div>
 
               <div style={{
                 maxWidth: '82%',
                 padding: '10px 14px',
                 borderRadius: '12px',
-                background: isUser ? 'rgba(56, 189, 248, 0.15)' : 'rgba(15, 23, 42, 0.85)',
-                border: isUser ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid var(--border-color)',
-                color: '#f8fafc',
+                background: isUser ? 'rgba(14, 165, 233, 0.12)' : 'var(--bg-input)',
+                border: isUser ? '1px solid rgba(14, 165, 233, 0.3)' : '1px solid var(--border-color)',
+                color: 'var(--text-main)',
                 fontSize: '13.5px',
                 lineHeight: '1.6',
                 whiteSpace: 'pre-wrap',
@@ -309,8 +312,8 @@ export default function ChatPlayground({ serverStatus, addToast }) {
         display: 'flex',
         gap: '8px',
         overflowX: 'auto',
-        background: 'rgba(0,0,0,0.2)',
-        borderTop: '1px solid rgba(255,255,255,0.04)'
+        background: 'var(--bg-subtle)',
+        borderTop: '1px solid var(--border-color)'
       }}>
         {quickPrompts.map((p, i) => (
           <button
@@ -322,8 +325,8 @@ export default function ChatPlayground({ serverStatus, addToast }) {
               padding: '2px 8px',
               fontSize: '11px',
               borderRadius: '999px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)'
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)'
             }}
           >
             {p}
@@ -337,7 +340,7 @@ export default function ChatPlayground({ serverStatus, addToast }) {
         borderTop: '1px solid var(--border-color)',
         display: 'flex',
         gap: '10px',
-        background: 'rgba(15, 23, 42, 0.6)'
+        background: 'var(--bg-card)'
       }}>
         <textarea
           rows={2}

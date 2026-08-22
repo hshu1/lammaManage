@@ -407,7 +407,7 @@ export default function DownloadTab({
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    background: 'rgba(15, 23, 42, 0.65)'
+                    background: 'var(--bg-card)'
                   }}
                 >
                   <div>

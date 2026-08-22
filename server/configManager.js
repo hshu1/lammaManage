@@ -127,6 +127,8 @@ export function getInitialConfig() {
   }
 
   return {
+    theme: rawConfig.theme || "system",
+    themePalette: rawConfig.themePalette || null,
     executablePath: exePath,
     modelsPath: modelsDir,
     defaultHost: rawConfig.defaultHost || "127.0.0.1",
@@ -164,6 +166,8 @@ export function getEffectiveConfig() {
   const result = { ...initial };
 
   const checkKeys = [
+    'theme',
+    'themePalette',
     'executablePath',
     'modelsPath',
     'defaultHost',
@@ -212,6 +216,7 @@ export function saveUserConfig(updates = {}) {
   if (!updates || typeof updates !== 'object') return getEffectiveConfig();
 
   const stringKeys = [
+    'theme',
     'executablePath',
     'modelsPath',
     'defaultHost',
@@ -224,6 +229,10 @@ export function saveUserConfig(updates = {}) {
     if (updates[key] !== undefined) {
       setUserSetting(key, updates[key]);
     }
+  }
+
+  if (updates.themePalette !== undefined) {
+    setUserSetting('themePalette', updates.themePalette);
   }
 
   if (updates.defaultPort !== undefined) {

@@ -17,18 +17,17 @@ export default function ToastContainer({ toasts, removeToast }) {
       pointerEvents: 'none'
     }}>
       {toasts.map((toast) => {
-        let icon = <Info size={18} style={{ color: '#38bdf8' }} />;
-        let border = 'rgba(56, 189, 248, 0.3)';
-        let bg = 'rgba(15, 23, 42, 0.95)';
+        let icon = <Info size={18} style={{ color: 'var(--c-llama-sky)' }} />;
+        let border = 'rgba(14, 165, 233, 0.4)';
 
         if (toast.type === 'success') {
-          icon = <CheckCircle2 size={18} style={{ color: '#10b981' }} />;
+          icon = <CheckCircle2 size={18} style={{ color: 'var(--c-emerald)' }} />;
           border = 'rgba(16, 185, 129, 0.4)';
         } else if (toast.type === 'error') {
-          icon = <AlertCircle size={18} style={{ color: '#f43f5e' }} />;
-          border = 'rgba(244, 63, 94, 0.4)';
+          icon = <AlertCircle size={18} style={{ color: 'var(--c-rose)' }} />;
+          border = 'rgba(239, 68, 68, 0.4)';
         } else if (toast.type === 'warning') {
-          icon = <AlertTriangle size={18} style={{ color: '#f59e0b' }} />;
+          icon = <AlertTriangle size={18} style={{ color: 'var(--c-amber)' }} />;
           border = 'rgba(245, 158, 11, 0.4)';
         }
 
@@ -37,16 +36,16 @@ export default function ToastContainer({ toasts, removeToast }) {
             key={toast.id}
             style={{
               pointerEvents: 'auto',
-              background: bg,
+              background: 'var(--bg-card)',
               border: `1px solid ${border}`,
-              backdropFilter: 'blur(12px)',
+              backdropFilter: 'blur(16px)',
               padding: '12px 16px',
               borderRadius: '12px',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+              boxShadow: 'var(--shadow-panel)',
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px',
-              color: '#f8fafc',
+              color: 'var(--text-main)',
               fontSize: '14px',
               lineHeight: '1.4',
               animation: 'slideIn 0.2s ease-out'
@@ -54,15 +53,15 @@ export default function ToastContainer({ toasts, removeToast }) {
           >
             <div style={{ flexShrink: 0, marginTop: '2px' }}>{icon}</div>
             <div style={{ flex: 1, wordBreak: 'break-word' }}>
-              {toast.title && <div style={{ fontWeight: 600, marginBottom: '2px' }}>{toast.title}</div>}
-              <div style={{ color: '#94a3b8', fontSize: '13px' }}>{toast.message}</div>
+              {toast.title && <div style={{ fontWeight: 600, marginBottom: '2px', color: 'var(--text-main)' }}>{toast.title}</div>}
+              <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{toast.message}</div>
             </div>
             <button
               onClick={() => removeToast(toast.id)}
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#64748b',
+                color: 'var(--c-muted-slate)',
                 cursor: 'pointer',
                 padding: '2px',
                 display: 'flex',

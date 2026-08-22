@@ -10,7 +10,10 @@ import {
   Plus, 
   Play, 
   Square,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 
 export default function Header({ 
@@ -18,6 +21,8 @@ export default function Header({
   setActiveTab, 
   serverStatus, 
   modelsCount, 
+  theme = 'system',
+  onThemeChange,
   onQuickAddClick,
   addToast 
 }) {
@@ -33,16 +38,23 @@ export default function Header({
     }
   };
 
+  const themeOptions = [
+    { id: 'system', label: '系统', icon: <Monitor size={13} />, title: '跟随系统色彩偏好' },
+    { id: 'dark', label: 'Dark', icon: <Moon size={13} />, title: '暗色极简主题' },
+    { id: 'light', label: 'Light', icon: <Sun size={13} />, title: '亮色极简主题' }
+  ];
+
   return (
     <header style={{
       borderBottom: '1px solid var(--border-color)',
-      background: 'rgba(9, 13, 22, 0.85)',
+      background: 'var(--header-bg)',
       backdropFilter: 'blur(20px)',
       position: 'sticky',
       top: 0,
-      zIndex: 50
+      zIndex: 50,
+      transition: 'background-color 0.25s ease, border-color 0.25s ease'
     }}>
-      <div className="app-container" style={{ padding: '16px 24px' }}>
+      <div className="app-container" style={{ padding: '14px 24px' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -53,15 +65,15 @@ export default function Header({
           {/* 左侧 Logo 与 标题 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              width: '42px',
-              height: '42px',
+              width: '40px',
+              height: '40px',
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 50%, #818cf8 100%)',
+              background: 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 20px rgba(56, 189, 248, 0.4)',
-              fontSize: '22px'
+              boxShadow: '0 0 16px rgba(14, 165, 233, 0.35)',
+              fontSize: '20px'
             }}>
               🦙
             </div>
@@ -73,7 +85,7 @@ export default function Header({
                 <span className="badge badge-primary" style={{ fontSize: '10px' }}>CUDA 13.3</span>
               </div>
               <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
-                本地大模型服务调度 · 参数调优 · HuggingFace 极速下载
+                本地大模型调度 · 极简 WebUI · HuggingFace 镜像极速下载
               </p>
             </div>
           </div>
@@ -83,7 +95,7 @@ export default function Header({
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: 'rgba(15, 23, 42, 0.7)',
+            background: 'var(--bg-card)',
             padding: '6px 14px',
             borderRadius: '999px',
             border: '1px solid var(--border-color)',
@@ -95,14 +107,17 @@ export default function Header({
               {isError && <span className="status-dot-red" />}
               {!isRunning && !isStarting && !isError && <span className="status-dot-gray" />}
 
-              <span style={{ fontWeight: 600, color: isRunning ? '#34d399' : isStarting ? '#fbbf24' : isError ? '#fb7185' : '#94a3b8' }}>
+              <span style={{ 
+                fontWeight: 600, 
+                color: isRunning ? 'var(--c-emerald)' : isStarting ? 'var(--c-amber)' : isError ? 'var(--c-rose)' : 'var(--text-muted)' 
+              }}>
                 {isRunning ? `服务运行中 (:${serverStatus.port})` : isStarting ? '正在加载模型...' : isError ? '服务异常' : '服务未启动'}
               </span>
             </div>
 
             {isRunning && (
               <>
-                <span style={{ color: 'rgba(255,255,255,0.1)' }}>|</span>
+                <span style={{ color: 'var(--border-color)' }}>|</span>
                 <span style={{ 
                   color: 'var(--text-muted)', 
                   maxWidth: '180px', 
@@ -117,7 +132,7 @@ export default function Header({
                     onClick={copyEndpoint}
                     title="复制 API 端点"
                     className="btn btn-ghost"
-                    style={{ padding: '4px 8px', height: '24px', fontSize: '11px', borderRadius: '6px' }}
+                    style={{ padding: '3px 8px', height: '24px', fontSize: '11px', borderRadius: '6px' }}
                   >
                     <Copy size={12} />
                     端点
@@ -128,7 +143,7 @@ export default function Header({
                     rel="noreferrer"
                     title="在浏览器中打开原生 llama.cpp WebUI"
                     className="btn btn-primary"
-                    style={{ padding: '4px 8px', height: '24px', fontSize: '11px', borderRadius: '6px', textDecoration: 'none' }}
+                    style={{ padding: '3px 8px', height: '24px', fontSize: '11px', borderRadius: '6px', textDecoration: 'none' }}
                   >
                     <ExternalLink size={12} />
                     WebUI
@@ -138,18 +153,65 @@ export default function Header({
             )}
           </div>
 
-          {/* 右侧 快速操作 */}
+          {/* 右侧 快速操作 & 主题切换器 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {/* 三态主题切换胶囊 (系统/Dark/Light) */}
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '2px',
+                gap: '2px'
+              }}
+              title="切换界面风格 (系统 / 暗色 / 亮色)"
+            >
+              {themeOptions.map((opt) => {
+                const isActive = theme === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => onThemeChange?.(opt.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      fontSize: '11.5px',
+                      fontWeight: isActive ? 600 : 500,
+                      borderRadius: '6px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      background: isActive 
+                        ? 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)' 
+                        : 'transparent',
+                      color: isActive ? 'var(--c-canvas-light)' : 'var(--text-muted)',
+                      boxShadow: isActive ? '0 2px 8px rgba(14, 165, 233, 0.25)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title={opt.title}
+                  >
+                    {opt.icon}
+                    <span>{opt.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               onClick={onQuickAddClick}
               className="btn btn-secondary"
               style={{
-                borderColor: 'rgba(168, 85, 247, 0.4)',
-                background: 'rgba(168, 85, 247, 0.1)',
-                color: '#d8b4fe'
+                borderColor: 'rgba(14, 165, 233, 0.35)',
+                background: 'rgba(14, 165, 233, 0.08)',
+                color: 'var(--c-llama-sky)',
+                fontSize: '13px',
+                padding: '6px 14px'
               }}
             >
-              <Plus size={16} />
+              <Plus size={15} />
               添加 / 下载 HF 模型
             </button>
           </div>
@@ -159,9 +221,9 @@ export default function Header({
         <nav style={{
           display: 'flex',
           gap: '8px',
-          marginTop: '16px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
-          paddingTop: '12px',
+          marginTop: '12px',
+          borderTop: '1px solid var(--border-color)',
+          paddingTop: '10px',
           overflowX: 'auto'
         }}>
           <button
@@ -169,7 +231,7 @@ export default function Header({
             className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ borderRadius: '10px' }}
           >
-            <Server size={16} />
+            <Server size={15} />
             🚀 服务控制台
           </button>
 
@@ -178,11 +240,11 @@ export default function Header({
             className={`btn ${activeTab === 'models' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ borderRadius: '10px' }}
           >
-            <HardDrive size={16} />
+            <HardDrive size={15} />
             📦 本地模型库
             {modelsCount > 0 && (
               <span style={{
-                background: activeTab === 'models' ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+                background: activeTab === 'models' ? 'rgba(255,255,255,0.2)' : 'rgba(100, 116, 139, 0.2)',
                 padding: '1px 6px',
                 borderRadius: '999px',
                 fontSize: '11px'
@@ -197,7 +259,7 @@ export default function Header({
             className={`btn ${activeTab === 'download' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ borderRadius: '10px' }}
           >
-            <DownloadCloud size={16} />
+            <DownloadCloud size={15} />
             🌐 HF 下载与收藏中心
           </button>
 
@@ -206,7 +268,7 @@ export default function Header({
             className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ borderRadius: '10px' }}
           >
-            <Settings size={16} />
+            <Settings size={15} />
             ⚙️ 系统与接口设置
           </button>
         </nav>

@@ -59,7 +59,7 @@ export default function QuickAddModal({
       left: 0,
       right: 0,
       bottom: 0,
-      background: 'rgba(0,0,0,0.8)',
+      background: 'rgba(0,0,0,0.7)',
       backdropFilter: 'blur(10px)',
       display: 'flex',
       alignItems: 'center',
@@ -71,13 +71,15 @@ export default function QuickAddModal({
         maxWidth: '92vw',
         padding: '24px',
         animation: 'scaleUp 0.2s ease-out',
-        background: 'rgba(15, 23, 42, 0.95)'
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-panel)'
       }}>
         {/* 弹窗头部 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Plus size={20} style={{ color: '#a855f7' }} />
-            <h3 style={{ fontSize: '18px', fontWeight: 800 }}>快速解析与导入 HuggingFace 模型</h3>
+            <Plus size={20} style={{ color: 'var(--c-llama-sky)' }} />
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-main)' }}>快速解析与导入 HuggingFace 模型</h3>
           </div>
           <button onClick={onClose} className="btn btn-ghost" style={{ padding: '4px' }}>
             <X size={18} />
@@ -101,17 +103,17 @@ export default function QuickAddModal({
           <div style={{
             padding: '12px 16px',
             borderRadius: '10px',
-            background: 'rgba(56, 189, 248, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
+            background: 'var(--bg-input)',
+            border: '1px solid var(--border-highlight)',
             marginBottom: '16px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--c-llama-sky)', fontWeight: 700, fontSize: '13px', marginBottom: '4px' }}>
               <Sparkles size={14} />
               <span>解析成功</span>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              <div>Repo: <strong style={{ color: '#f8fafc' }}>{parsed.repoId}</strong></div>
-              <div>File: <strong style={{ color: '#a855f7' }}>{parsed.filename}</strong></div>
+              <div>Repo: <strong style={{ color: 'var(--text-main)' }}>{parsed.repoId}</strong></div>
+              <div>File: <strong style={{ color: 'var(--c-llama-sky)' }}>{parsed.filename}</strong></div>
             </div>
           </div>
         )}

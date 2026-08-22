@@ -509,7 +509,7 @@ export default function DashboardTab({
                     padding: '4px 10px',
                     width: 'auto',
                     minWidth: '120px',
-                    background: 'rgba(15, 23, 42, 0.9)'
+                    background: 'var(--bg-input)'
                   }}
                 >
                   <option value="all">全部上下文</option>
@@ -531,7 +531,7 @@ export default function DashboardTab({
                     padding: '4px 10px',
                     width: 'auto',
                     minWidth: '145px',
-                    background: 'rgba(15, 23, 42, 0.9)'
+                    background: 'var(--bg-input)'
                   }}
                 >
                   <option value="all">全部占用范围</option>
@@ -556,7 +556,7 @@ export default function DashboardTab({
                 padding: '24px',
                 textAlign: 'center',
                 color: 'var(--text-muted)',
-                background: 'rgba(15, 23, 42, 0.4)',
+                background: 'var(--bg-subtle)',
                 borderRadius: '10px',
                 border: '1px dashed var(--border-color)',
                 fontSize: '13px'
@@ -580,9 +580,9 @@ export default function DashboardTab({
                       padding: '14px',
                       cursor: isRunning ? 'not-allowed' : 'pointer',
                       opacity: isRunning ? 0.7 : 1,
-                      background: isSelected ? 'rgba(56, 189, 248, 0.12)' : 'rgba(15, 23, 42, 0.6)',
-                      borderColor: isSelected ? '#38bdf8' : 'var(--border-color)',
-                      boxShadow: isSelected ? '0 0 15px rgba(56, 189, 248, 0.2)' : 'none',
+                      background: isSelected ? 'rgba(14, 165, 233, 0.12)' : 'var(--bg-card)',
+                      borderColor: isSelected ? 'var(--c-llama-sky)' : 'var(--border-color)',
+                      boxShadow: isSelected ? 'var(--border-glow)' : 'none',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between'
@@ -590,10 +590,10 @@ export default function DashboardTab({
                   >
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontWeight: 700, fontSize: '13.5px', color: isSelected ? '#38bdf8' : '#f8fafc' }}>
+                        <span style={{ fontWeight: 700, fontSize: '13.5px', color: isSelected ? 'var(--c-llama-sky)' : 'var(--text-main)' }}>
                           {preset.name}
                         </span>
-                        {isSelected && <CheckCircle2 size={16} style={{ color: '#38bdf8' }} />}
+                        {isSelected && <CheckCircle2 size={16} style={{ color: 'var(--c-llama-sky)' }} />}
                       </div>
 
                       <p style={{ fontSize: '11.5px', color: 'var(--text-dim)', lineHeight: '1.4', marginBottom: '12px' }}>
@@ -615,7 +615,7 @@ export default function DashboardTab({
                       <div style={{
                         marginTop: '8px',
                         paddingTop: '8px',
-                        borderTop: '1px dashed rgba(255,255,255,0.08)',
+                        borderTop: '1px dashed var(--border-color)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between'
@@ -624,11 +624,11 @@ export default function DashboardTab({
                         <span style={{
                           fontSize: '12px',
                           fontWeight: 800,
-                          color: vramEst.totalVramNumber > 11 ? '#c084fc' : vramEst.totalVramNumber > 8 ? '#38bdf8' : '#34d399',
-                          background: 'rgba(0,0,0,0.35)',
+                          color: vramEst.totalVramNumber > 11 ? 'var(--c-amber)' : vramEst.totalVramNumber > 8 ? 'var(--c-llama-sky)' : 'var(--c-emerald)',
+                          background: 'var(--bg-input)',
                           padding: '2px 8px',
                           borderRadius: '6px',
-                          border: '1px solid rgba(255,255,255,0.06)'
+                          border: '1px solid var(--border-color)'
                         }}>
                           🔥 ~{vramEst.totalVram} GB {vramEst.isPartialOffload ? `(+${vramEst.systemRam}G内存)` : ''}
                         </span>
@@ -646,8 +646,8 @@ export default function DashboardTab({
           marginBottom: '20px',
           padding: '12px 16px',
           borderRadius: '10px',
-          background: 'rgba(15, 23, 42, 0.8)',
-          border: '1px solid rgba(56, 189, 248, 0.2)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-highlight)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -655,9 +655,9 @@ export default function DashboardTab({
           gap: '12px'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Gauge size={18} style={{ color: '#38bdf8' }} />
+            <Gauge size={18} style={{ color: 'var(--c-llama-sky)' }} />
             <div>
-              <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#f8fafc' }}>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-main)' }}>
                 当前启动参数 · 满上下文峰值资源预算:
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-dim)', marginTop: '2px' }}>

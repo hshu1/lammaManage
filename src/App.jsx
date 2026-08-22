@@ -7,9 +7,11 @@ import SettingsTab from './components/SettingsTab.jsx';
 import QuickAddModal from './components/QuickAddModal.jsx';
 import ToastContainer from './components/Toast.jsx';
 import { api } from './api/client.js';
+import { resolveActualTheme } from './theme/themeConfig.js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [theme, setTheme] = useState(() => localStorage.getItem('lamma_theme') || 'system');
   const [config, setConfig] = useState(null);
   const [configMeta, setConfigMeta] = useState({ isCustomized: false, overriddenKeys: [] });
   const [models, setModels] = useState([]);
@@ -19,6 +21,28 @@ export default function App() {
   const [logs, setLogs] = useState([]);
   const [toasts, setToasts] = useState([]);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
+  // 动态同步主题到 DOM 根节点及系统偏好监听
+  useEffect(() => {
+    const applyTheme = () => {
+      const actual = resolveActualTheme(theme);
+      document.documentElement.setAttribute('data-theme', actual);
+    };
+
+    applyTheme();
+
+    if (theme === 'system' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => applyTheme();
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', listener);
+        return () => mediaQuery.removeEventListener('change', listener);
+      } else if (mediaQuery.addListener) {
+        mediaQuery.addListener(listener);
+        return () => mediaQuery.removeListener(listener);
+      }
+    }
+  }, [theme]);
 
   const addToast = useCallback(({ type = 'info', title, message }) => {
     const id = Date.now() + Math.random().toString(36).substring(2, 6);
@@ -38,6 +62,10 @@ export default function App() {
       const res = await api.getConfig();
       if (res.success) {
         setConfig(res.config);
+        if (res.config.theme) {
+          setTheme(res.config.theme);
+          localStorage.setItem('lamma_theme', res.config.theme);
+        }
         setConfigMeta({
           isCustomized: res.isCustomized || false,
           overriddenKeys: res.overriddenKeys || []
@@ -330,6 +358,23 @@ export default function App() {
     }
   };
 
+  // 切换并持久化主题
+  const handleThemeChange = async (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('lamma_theme', newTheme);
+    const themeLabels = { system: '跟随系统', dark: '简约暗色', light: '简约亮色' };
+    addToast({
+      type: 'info',
+      title: '已切换主题',
+      message: `界面主题已切换为: ${themeLabels[newTheme] || newTheme}`
+    });
+    try {
+      await handleSaveConfig({ theme: newTheme });
+    } catch (e) {
+      console.warn('Persisting theme to backend failed:', e);
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部导航 */}
@@ -338,6 +383,8 @@ export default function App() {
         setActiveTab={setActiveTab}
         serverStatus={serverStatus}
         modelsCount={models.length}
+        theme={theme}
+        onThemeChange={handleThemeChange}
         onQuickAddClick={() => setIsQuickAddOpen(true)}
         addToast={addToast}
       />
@@ -395,6 +442,8 @@ export default function App() {
               <SettingsTab
                 config={config}
                 configMeta={configMeta}
+                theme={theme}
+                onThemeChange={handleThemeChange}
                 onSaveConfig={handleSaveConfig}
                 onResetConfig={handleResetConfig}
                 onOpenFolder={handleOpenFolder}

@@ -71,12 +71,12 @@ export default function ModelsTab({
         }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <HardDrive size={22} style={{ color: '#38bdf8' }} />
-              <h2 style={{ fontSize: '20px', fontWeight: 800 }}>本地 GGUF 模型库</h2>
+              <HardDrive size={22} style={{ color: 'var(--c-llama-sky)' }} />
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-main)' }}>本地 GGUF 模型库</h2>
               <span className="badge badge-primary">{models.length} 个模型</span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              存储目录: <span style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{config?.modelsPath}</span>
+              存储目录: <span style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{config?.modelsPath}</span>
             </p>
           </div>
 
@@ -154,7 +154,7 @@ export default function ModelsTab({
           color: 'var(--text-muted)'
         }}>
           <HardDrive size={48} style={{ opacity: 0.2, margin: '0 auto 16px' }} />
-          <h3 style={{ fontSize: '16px', color: '#f8fafc', marginBottom: '8px' }}>
+          <h3 style={{ fontSize: '16px', color: 'var(--text-main)', marginBottom: '8px' }}>
             {search || familyFilter !== 'ALL' ? '未找到符合条件的本地模型' : '本地模型库暂无 GGUF 模型'}
           </h3>
           <p style={{ fontSize: '13px', maxWidth: '460px', margin: '0 auto 20px' }}>
@@ -181,17 +181,17 @@ export default function ModelsTab({
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  background: isActive ? 'rgba(56, 189, 248, 0.08)' : 'var(--bg-card)',
-                  borderColor: isActive ? '#38bdf8' : 'var(--border-color)',
-                  boxShadow: isActive ? '0 0 20px rgba(56, 189, 248, 0.25)' : 'none'
+                  background: isActive ? 'rgba(14, 165, 233, 0.1)' : 'var(--bg-card)',
+                  borderColor: isActive ? 'var(--c-llama-sky)' : 'var(--border-color)',
+                  boxShadow: isActive ? 'var(--border-glow)' : 'none'
                 }}
               >
                 <div>
                   {/* 卡片头部标签 */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      <span className="badge badge-purple">{model.family}</span>
-                      {model.params && <span className="badge badge-primary">{model.params}</span>}
+                      <span className="badge badge-primary">{model.family}</span>
+                      {model.params && <span className="badge badge-neutral">{model.params}</span>}
                       <span className="badge badge-emerald">{model.quant}</span>
                     </div>
 
@@ -207,7 +207,7 @@ export default function ModelsTab({
                   <h4 style={{
                     fontSize: '15px',
                     fontWeight: 700,
-                    color: '#f8fafc',
+                    color: 'var(--text-main)',
                     lineHeight: '1.4',
                     wordBreak: 'break-all',
                     marginBottom: '10px'
@@ -222,16 +222,16 @@ export default function ModelsTab({
                     gap: '8px',
                     fontSize: '12px',
                     color: 'var(--text-muted)',
-                    background: 'rgba(0,0,0,0.2)',
+                    background: 'var(--bg-subtle)',
                     padding: '8px 12px',
                     borderRadius: '8px',
                     marginBottom: '16px'
                   }}>
                     <div>
-                      文件大小: <strong style={{ color: '#38bdf8' }}>{model.sizeFormatted}</strong>
+                      文件大小: <strong style={{ color: 'var(--c-llama-sky)' }}>{model.sizeFormatted}</strong>
                     </div>
                     <div>
-                      修改日期: <span style={{ color: '#cbd5e1' }}>{formatTime(model.modifiedTime)}</span>
+                      修改日期: <span style={{ color: 'var(--text-muted)' }}>{formatTime(model.modifiedTime)}</span>
                     </div>
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function ModelsTab({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   paddingTop: '12px',
-                  borderTop: '1px solid rgba(255,255,255,0.06)'
+                  borderTop: '1px solid var(--border-color)'
                 }}>
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
@@ -265,7 +265,7 @@ export default function ModelsTab({
                       onClick={() => setModelToDelete(model)}
                       disabled={isActive}
                       className="btn btn-ghost"
-                      style={{ padding: '6px', height: '30px', color: '#fb7185' }}
+                      style={{ padding: '6px', height: '30px', color: 'var(--c-rose)' }}
                       title="删除模型文件"
                     >
                       <Trash2 size={14} />
@@ -295,20 +295,20 @@ export default function ModelsTab({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.75)',
+          background: 'rgba(0,0,0,0.7)',
           backdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 999
         }}>
-          <div className="glass-panel" style={{ width: '420px', padding: '24px', animation: 'scaleUp 0.2s ease-out' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fb7185', marginBottom: '12px' }}>
+          <div className="glass-panel" style={{ width: '420px', padding: '24px', animation: 'scaleUp 0.2s ease-out', background: 'var(--bg-card)' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--c-rose)', marginBottom: '12px' }}>
               确认删除模型文件？
             </h3>
-            <p style={{ fontSize: '13.5px', color: '#cbd5e1', lineHeight: '1.5', marginBottom: '16px' }}>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
               即将从磁盘中永久删除模型：<br />
-              <strong style={{ color: '#f8fafc', wordBreak: 'break-all' }}>{modelToDelete.filename}</strong>
+              <strong style={{ color: 'var(--text-main)', wordBreak: 'break-all' }}>{modelToDelete.filename}</strong>
               <br />
               <span style={{ fontSize: '12px', color: 'var(--text-dim)' }}>体积: {modelToDelete.sizeFormatted}</span>
             </p>

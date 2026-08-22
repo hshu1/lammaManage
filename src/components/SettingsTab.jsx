@@ -17,20 +17,29 @@ import {
   FileCode,
   HardDrive,
   Database,
-  RotateCcw
+  RotateCcw,
+  Palette,
+  Sun,
+  Moon,
+  Monitor,
+  Check
 } from 'lucide-react';
 import { api } from '../api/client.js';
 import FileBrowserModal from './FileBrowserModal.jsx';
+import { PALETTE_COLORS, THEME_OPTIONS, GRADIENT_SPECS } from '../theme/themeConfig.js';
 
 export default function SettingsTab({
   config,
   configMeta = {},
+  theme = 'system',
+  onThemeChange,
   onSaveConfig,
   onResetConfig,
   onOpenFolder,
   addToast
 }) {
   const [formData, setFormData] = useState({
+    theme: 'system',
     executablePath: '',
     modelsPath: '',
     defaultHost: '127.0.0.1',
@@ -43,22 +52,6 @@ export default function SettingsTab({
   const [resetting, setResetting] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [activeCodeTab, setActiveCodeTab] = useState('python');
-
-  const handleResetDefaults = async () => {
-    if (!window.confirm('确定要清空 SQLite 个人参数并恢复为出厂默认初始化配置 (JSON) 吗？')) {
-      return;
-    }
-    setResetting(true);
-    try {
-      if (onResetConfig) {
-        await onResetConfig();
-      }
-    } catch (e) {
-      addToast?.({ type: 'error', title: '重置失败', message: e.message });
-    } finally {
-      setResetting(false);
-    }
-  };
 
   // 文件/目录树浏览弹窗状态
   const [browserModal, setBrowserModal] = useState({
@@ -73,6 +66,7 @@ export default function SettingsTab({
   useEffect(() => {
     if (config) {
       setFormData({
+        theme: config.theme || theme || 'system',
         executablePath: config.executablePath || '',
         modelsPath: config.modelsPath || '',
         defaultHost: config.defaultHost || '127.0.0.1',
@@ -81,7 +75,24 @@ export default function SettingsTab({
         hfToken: config.hfToken || ''
       });
     }
-  }, [config]);
+  }, [config, theme]);
+
+  const handleResetDefaults = async () => {
+    if (!window.confirm('确定要清空 SQLite 个人参数并恢复为出厂默认初始化配置 (JSON) 吗？主题也将重置为系统默认。')) {
+      return;
+    }
+    setResetting(true);
+    try {
+      if (onResetConfig) {
+        await onResetConfig();
+        onThemeChange?.('system');
+      }
+    } catch (e) {
+      addToast?.({ type: 'error', title: '重置失败', message: e.message });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // 选择 llama-server.exe 文件
   const handleSelectExecutable = async () => {
@@ -95,7 +106,6 @@ export default function SettingsTab({
         setFormData(prev => ({ ...prev, executablePath: res.path }));
         addToast?.({ type: 'success', title: '已选择文件', message: res.path });
       } else if (res.error) {
-        // 若原生系统弹窗受限，自动弹出内置可视化目录选择器
         setBrowserModal({
           isOpen: true,
           mode: 'file',
@@ -216,12 +226,17 @@ export default function SettingsTab({
     }
   };
 
+  const handleSelectTheme = (themeId) => {
+    setFormData(prev => ({ ...prev, theme: themeId }));
+    onThemeChange?.(themeId);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     try {
       await onSaveConfig(formData);
-      addToast?.({ type: 'success', title: '保存成功', message: '系统设置与路径配置已成功持久化' });
+      addToast?.({ type: 'success', title: '保存成功', message: '系统设置与主题配置已成功持久化到 SQLite' });
     } catch (err) {
       addToast?.({ type: 'error', title: '保存失败', message: err.message });
     } finally {
@@ -268,7 +283,174 @@ for chunk in response:
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* 路径与网络核心配置 */}
+      {/* 1. UI 主题与极简调色盘设计板块 */}
+      <div className="glass-panel" style={{ padding: '24px' }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          marginBottom: '18px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Palette size={22} style={{ color: 'var(--c-llama-sky)' }} />
+            <h2 style={{ fontSize: '18px', fontWeight: 800 }}>UI 风格设置与 10 色调色盘规范</h2>
+          </div>
+
+          <span className="badge badge-primary" style={{ fontSize: '12px', padding: '4px 10px' }}>
+            Llama WebUI 简约调色体系 (≤ 10色)
+          </span>
+        </div>
+
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '18px', lineHeight: '1.5' }}>
+          遵循 Llama / Ollama WebUI 极简克制美学。全站严格收敛于 <strong>10 种单色调色盘</strong>，所有渐变仅允许在这 10 种基础色之间插值生成，杜绝视觉噪点。
+        </p>
+
+        {/* 主题选择 3 态卡片 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '14px',
+          marginBottom: '24px'
+        }}>
+          {THEME_OPTIONS.map((opt) => {
+            const isSelected = (formData.theme || theme) === opt.id;
+            const IconComponent = opt.id === 'system' ? Monitor : opt.id === 'dark' ? Moon : Sun;
+
+            return (
+              <div
+                key={opt.id}
+                onClick={() => handleSelectTheme(opt.id)}
+                style={{
+                  padding: '16px',
+                  borderRadius: 'var(--radius-md)',
+                  background: isSelected ? 'var(--bg-card-hover)' : 'var(--bg-card)',
+                  border: isSelected ? '2px solid var(--c-llama-sky)' : '1px solid var(--border-color)',
+                  boxShadow: isSelected ? 'var(--border-glow)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  position: 'relative'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '8px',
+                      background: isSelected 
+                        ? 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)' 
+                        : 'var(--bg-subtle)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isSelected ? 'var(--c-canvas-light)' : 'var(--text-muted)'
+                    }}>
+                      <IconComponent size={16} />
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: '15px', color: isSelected ? 'var(--c-llama-sky)' : 'var(--text-main)' }}>
+                      {opt.label}
+                    </span>
+                  </div>
+
+                  {isSelected && (
+                    <div style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      background: 'var(--c-llama-sky)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Check size={13} strokeWidth={3} />
+                    </div>
+                  )}
+                </div>
+
+                <p style={{ fontSize: '12px', color: 'var(--text-dim)', lineHeight: '1.45', margin: 0 }}>
+                  {opt.desc}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 10 色调色盘与渐变规范折叠/展示 */}
+        <div style={{
+          background: 'var(--bg-input)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          padding: '16px'
+        }}>
+          <div style={{ fontWeight: 700, fontSize: '13.5px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span>🎨 严格 10 色单色调色盘 (Strict Palette Specs)</span>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+            gap: '10px',
+            marginBottom: '16px'
+          }}>
+            {PALETTE_COLORS.map((col, idx) => (
+              <div
+                key={col.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)'
+                }}
+              >
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '6px',
+                  background: col.hex,
+                  border: '1px solid rgba(100, 116, 139, 0.3)',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                }} />
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {idx + 1}. {col.name}
+                  </div>
+                  <div style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--c-muted-slate)' }}>
+                    {col.hex}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 渐变规范示意 */}
+          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
+              ✨ 调色盘内插值渐变 (Gradients Restricted to Defined 10 Colors)
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '8px'
+            }}>
+              {GRADIENT_SPECS.map(g => (
+                <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--text-dim)' }}>
+                  <div style={{ width: '28px', height: '14px', borderRadius: '4px', background: g.css, flexShrink: 0 }} />
+                  <span>{g.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. 路径与网络核心配置 */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{
           display: 'flex',
@@ -280,13 +462,13 @@ for chunk in response:
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Settings size={22} style={{ color: '#38bdf8' }} />
+              <Settings size={22} style={{ color: 'var(--c-llama-sky)' }} />
               <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
             </div>
             
             {/* 存储模式指示器 */}
             <span 
-              className={`badge ${configMeta.isCustomized ? 'badge-amber' : 'badge-green'}`} 
+              className={`badge ${configMeta.isCustomized ? 'badge-amber' : 'badge-emerald'}`} 
               style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', fontSize: '12px' }}
               title={configMeta.isCustomized ? '已启用 SQLite 个人易变参数覆盖' : '使用出厂 JSON 初始化参数'}
             >
@@ -304,9 +486,9 @@ for chunk in response:
               style={{
                 padding: '6px 14px',
                 fontSize: '13px',
-                color: '#38bdf8',
-                borderColor: 'rgba(56, 189, 248, 0.4)',
-                background: 'rgba(56, 189, 248, 0.08)'
+                color: 'var(--c-llama-sky)',
+                borderColor: 'rgba(14, 165, 233, 0.4)',
+                background: 'rgba(14, 165, 233, 0.08)'
               }}
             >
               <Sparkles size={15} />
@@ -355,7 +537,7 @@ for chunk in response:
                   type="button"
                   onClick={handleAutoDetect}
                   className="btn btn-ghost"
-                  style={{ fontSize: '12px', padding: '3px 8px', color: '#38bdf8' }}
+                  style={{ fontSize: '12px', padding: '3px 8px', color: 'var(--c-llama-sky)' }}
                 >
                   <Sparkles size={13} />
                   自动扫描
@@ -411,7 +593,7 @@ for chunk in response:
                   type="button"
                   onClick={handleAutoDetect}
                   className="btn btn-ghost"
-                  style={{ fontSize: '12px', padding: '3px 8px', color: '#38bdf8' }}
+                  style={{ fontSize: '12px', padding: '3px 8px', color: 'var(--c-llama-sky)' }}
                 >
                   <Sparkles size={13} />
                   自动扫描
@@ -463,7 +645,7 @@ for chunk in response:
             gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
             gap: '16px',
             paddingTop: '10px',
-            borderTop: '1px solid rgba(255,255,255,0.06)'
+            borderTop: '1px solid var(--border-color)'
           }}>
             <div>
               <label className="input-label">HuggingFace 默认下载源 / 镜像端点:</label>
@@ -497,7 +679,7 @@ for chunk in response:
             flexWrap: 'wrap',
             gap: '12px',
             paddingTop: '16px',
-            borderTop: '1px solid rgba(255,255,255,0.06)'
+            borderTop: '1px solid var(--border-color)'
           }}>
             <button
               type="button"
@@ -505,9 +687,9 @@ for chunk in response:
               disabled={resetting || saving}
               className="btn btn-ghost"
               style={{
-                color: '#f87171',
+                color: 'var(--c-rose)',
                 borderColor: 'rgba(239, 68, 68, 0.3)',
-                background: 'rgba(239, 68, 68, 0.05)',
+                background: 'rgba(239, 68, 68, 0.06)',
                 fontSize: '13px',
                 padding: '8px 16px'
               }}
@@ -530,10 +712,10 @@ for chunk in response:
         </form>
       </div>
 
-      {/* 接口文档与第三方客户端对接指南 */}
+      {/* 3. 接口文档与第三方客户端对接指南 */}
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <Globe size={22} style={{ color: '#a855f7' }} />
+          <Globe size={22} style={{ color: 'var(--c-llama-sky)' }} />
           <h2 style={{ fontSize: '18px', fontWeight: 800 }}>OpenAI 兼容 API 接入与第三方客户端配置</h2>
         </div>
 
@@ -548,23 +730,23 @@ for chunk in response:
           gap: '12px',
           marginBottom: '20px'
         }}>
-          <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid var(--border-color)' }}>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#38bdf8', marginBottom: '6px' }}>
+          <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--c-llama-sky)', marginBottom: '6px' }}>
               Cherry Studio / Chatbox
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
               <div>• 提供商选择: <strong>OpenAI 兼容 / 自定义</strong></div>
-              <div>• API Base URL: <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}/v1</strong></div>
+              <div>• API Base URL: <strong style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}/v1</strong></div>
               <div>• API Key: <strong>任意填写 (如 123)</strong></div>
             </div>
           </div>
 
-          <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid var(--border-color)' }}>
-            <div style={{ fontWeight: 700, fontSize: '14px', color: '#a855f7', marginBottom: '6px' }}>
+          <div style={{ padding: '14px', borderRadius: '10px', background: 'var(--bg-input)', border: '1px solid var(--border-color)' }}>
+            <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--c-emerald)', marginBottom: '6px' }}>
               NextChat (ChatGPT-Next-Web)
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-              <div>• 接口地址: <strong style={{ color: '#f8fafc', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}</strong></div>
+              <div>• 接口地址: <strong style={{ color: 'var(--text-main)', fontFamily: 'var(--font-mono)' }}>{currentEndpoint}</strong></div>
               <div>• 模型名称: <strong>输入当前运行的模型名称</strong></div>
               <div>• API Key: <strong>空或任意值</strong></div>
             </div>
@@ -602,7 +784,7 @@ for chunk in response:
           </div>
 
           <pre style={{
-            background: 'rgba(5, 8, 15, 0.95)',
+            background: 'var(--terminal-bg)',
             border: '1px solid var(--border-color)',
             borderRadius: '10px',
             padding: '14px',

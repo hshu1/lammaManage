@@ -38,7 +38,7 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
         gap: '10px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: 700, fontSize: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--c-llama-sky)', fontWeight: 700, fontSize: '14px' }}>
             <Terminal size={18} />
             <span>实时终端输出</span>
           </div>
@@ -63,14 +63,14 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
           </div>
 
           {/* 级别过滤 */}
-          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', padding: '2px' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-subtle)', borderRadius: '6px', padding: '2px' }}>
             {['all', 'stdout', 'stderr', 'sys'].map((type) => (
               <button
                 key={type}
                 onClick={() => setFilter(type)}
                 style={{
-                  background: filter === type ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                  color: filter === type ? '#38bdf8' : 'var(--text-dim)',
+                  background: filter === type ? 'rgba(14, 165, 233, 0.2)' : 'transparent',
+                  color: filter === type ? 'var(--c-llama-sky)' : 'var(--text-dim)',
                   border: 'none',
                   padding: '3px 8px',
                   borderRadius: '4px',
@@ -92,7 +92,7 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
               padding: '4px 8px',
               height: '28px',
               fontSize: '11px',
-              color: autoScroll ? '#34d399' : 'var(--text-dim)',
+              color: autoScroll ? 'var(--c-emerald)' : 'var(--text-dim)',
               borderColor: autoScroll ? 'rgba(16, 185, 129, 0.3)' : 'transparent'
             }}
             title="新日志生成时自动滚动到底部"
@@ -115,7 +115,7 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
           <button
             onClick={onClear}
             className="btn btn-ghost"
-            style={{ padding: '4px 8px', height: '28px', fontSize: '11px', color: '#fb7185' }}
+            style={{ padding: '4px 8px', height: '28px', fontSize: '11px', color: 'var(--c-rose)' }}
             title="清空日志缓存"
           >
             <Trash2 size={12} />
@@ -129,14 +129,16 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
         style={{
           flex: 1,
           padding: '12px 16px',
-          background: 'rgba(5, 8, 15, 0.95)',
+          background: 'var(--terminal-bg)',
           overflowY: 'auto',
           fontFamily: 'var(--font-mono)',
           fontSize: '12.5px',
           lineHeight: '1.6',
           color: '#e2e8f0',
           whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all'
+          wordBreak: 'break-all',
+          borderBottomLeftRadius: 'var(--radius-lg)',
+          borderBottomRightRadius: 'var(--radius-lg)'
         }}
       >
         {filteredLogs.length === 0 ? (
@@ -159,18 +161,18 @@ export default function LogViewer({ logs = [], onClear, addToast }) {
             let tagBadge = null;
 
             if (log.source === 'sys') {
-              color = '#38bdf8';
-              tagBadge = <span style={{ color: '#0284c7', marginRight: '6px' }}>[SYS]</span>;
+              color = 'var(--c-llama-sky)';
+              tagBadge = <span style={{ color: 'var(--c-llama-sky)', marginRight: '6px', opacity: 0.8 }}>[SYS]</span>;
             } else if (log.source === 'stderr') {
               if (log.content.includes('error') || log.content.includes('failed') || log.content.includes('CUDA error')) {
-                color = '#fb7185';
+                color = 'var(--c-rose)';
               } else if (log.content.includes('warning') || log.content.includes('warn')) {
-                color = '#fbbf24';
+                color = 'var(--c-amber)';
               } else {
-                color = '#94a3b8';
+                color = 'var(--c-muted-slate)';
               }
             } else if (log.content.includes('HTTP server is listening') || log.content.includes('✅')) {
-              color = '#34d399';
+              color = 'var(--c-emerald)';
             }
 
             return (

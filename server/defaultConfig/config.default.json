@@ -1,4 +1,28 @@
 {
+  "theme": "system",
+  "themePalette": {
+    "theme": "system",
+    "palette": [
+      { "id": "canvas-dark", "name": "暗色画布基底", "hex": "#0B0F17", "role": "Dark Background" },
+      { "id": "surface-dark", "name": "暗色表面卡片", "hex": "#151D2A", "role": "Dark Surface / Light Text" },
+      { "id": "border-slate", "name": "暗色边框线条", "hex": "#283548", "role": "Dark Border / Slate Divider" },
+      { "id": "canvas-light", "name": "亮色画布纯白", "hex": "#FFFFFF", "role": "Light Card / Dark Text" },
+      { "id": "surface-light", "name": "亮色表面卡片", "hex": "#F4F6F9", "role": "Light Background / Input" },
+      { "id": "muted-slate", "name": "中性文字灰", "hex": "#64748B", "role": "Secondary Text / Muted" },
+      { "id": "llama-sky", "name": "Llama 天空蓝", "hex": "#0EA5E9", "role": "Primary Brand Accent" },
+      { "id": "emerald", "name": "翡翠绿", "hex": "#10B981", "role": "Success / Running" },
+      { "id": "amber", "name": "琥珀黄", "hex": "#F59E0B", "role": "Warning / Starting" },
+      { "id": "rose", "name": "玫瑰红", "hex": "#EF4444", "role": "Danger / Stopped" }
+    ],
+    "gradients": {
+      "brand": ["#0EA5E9", "#10B981"],
+      "success": ["#10B981", "#0EA5E9"],
+      "warning": ["#F59E0B", "#EF4444"],
+      "danger": ["#EF4444", "#F59E0B"],
+      "textDark": ["#FFFFFF", "#0EA5E9"],
+      "textLight": ["#151D2A", "#0EA5E9"]
+    }
+  },
   "executablePath": "",
   "modelsPath": "",
   "defaultHost": "127.0.0.1",
