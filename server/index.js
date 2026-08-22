@@ -223,8 +223,8 @@ app.post('/api/models/open-folder', async (req, res) => {
 // 弹出 Windows 原生文件选择对话框
 app.post('/api/utils/select-file', async (req, res) => {
   try {
-    const { title, filter } = req.body || {};
-    const result = await openNativeFilePicker(title, filter);
+    const { title, filter, initialPath } = req.body || {};
+    const result = await openNativeFilePicker(title, filter, initialPath);
     res.json(result);
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
@@ -234,8 +234,8 @@ app.post('/api/utils/select-file', async (req, res) => {
 // 弹出 Windows 原生文件夹选择对话框
 app.post('/api/utils/select-folder', async (req, res) => {
   try {
-    const { title } = req.body || {};
-    const result = await openNativeFolderPicker(title);
+    const { title, initialPath } = req.body || {};
+    const result = await openNativeFolderPicker(title, initialPath);
     res.json(result);
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });

@@ -88,7 +88,8 @@ export default function SettingsTab({
     try {
       const res = await api.selectFile({
         title: '选择 llama-server.exe 可执行文件',
-        filter: '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*'
+        filter: '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*',
+        initialPath: formData.executablePath || ''
       });
       if (res.success && res.path) {
         setFormData(prev => ({ ...prev, executablePath: res.path }));
@@ -120,7 +121,8 @@ export default function SettingsTab({
   const handleSelectModelsFolder = async () => {
     try {
       const res = await api.selectFolder({
-        title: '选择本地 GGUF 模型存储目录'
+        title: '选择本地 GGUF 模型存储目录',
+        initialPath: formData.modelsPath || ''
       });
       if (res.success && res.path) {
         setFormData(prev => ({ ...prev, modelsPath: res.path }));

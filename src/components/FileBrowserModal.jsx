@@ -65,11 +65,13 @@ export default function FileBrowserModal({
       if (mode === 'file') {
         res = await api.selectFile({
           title: title || '选择文件',
-          filter: filterExt === '.exe' ? '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*' : '所有文件 (*.*)|*.*'
+          filter: filterExt === '.exe' ? '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*' : '所有文件 (*.*)|*.*',
+          initialPath: currentPath || initialPath || ''
         });
       } else {
         res = await api.selectFolder({
-          title: title || '选择文件夹'
+          title: title || '选择文件夹',
+          initialPath: currentPath || initialPath || ''
         });
       }
 
@@ -179,6 +181,16 @@ export default function FileBrowserModal({
           >
             <ArrowUp size={14} />
             上一级
+          </button>
+
+          <button
+            onClick={() => loadDirectory('__DOCUMENTS__')}
+            className="btn btn-ghost"
+            style={{ padding: '4px 8px', fontSize: '12px', color: '#38bdf8' }}
+            title="快速定位到系统我的文档目录"
+          >
+            <Folder size={13} />
+            我的文档
           </button>
 
           <button

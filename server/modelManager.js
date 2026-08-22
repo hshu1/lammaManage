@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
+import os from 'os';
+import { exec, spawn } from 'child_process';
 
 /**
  * 格式化字节大小为人类可读字符串
@@ -175,8 +176,8 @@ function runPowerShellPicker(script) {
     });
     let stdout = '';
     let stderr = '';
-    ps.stdout.on('data', (d) => stdout += d.toString());
-    ps.stderr.on('data', (d) => stderr += d.toString());
+    ps.stdout.on('data', (d) => stdout += d.toString('utf8'));
+    ps.stderr.on('data', (d) => stderr += d.toString('utf8'));
     ps.on('close', (code) => {
       const selected = stdout ? stdout.trim().split(/\r?\n/).pop().trim() : '';
       if (code === 0 && selected) {
@@ -192,39 +193,224 @@ function runPowerShellPicker(script) {
 }
 
 /**
+ * 解析有效的基础目录（如果传入的路径有效且存在，则取该目录或文件所在目录；否则默认返回系统“我的文档”目录）
+ */
+export function resolveInitialDir(rawPath) {
+  try {
+    if (rawPath && typeof rawPath === 'string') {
+      const cleanPath = rawPath.trim().replace(/^['"]+|['"]+$/g, '');
+      if (cleanPath && fs.existsSync(cleanPath)) {
+        const stat = fs.statSync(cleanPath);
+        if (stat.isDirectory()) {
+          return cleanPath;
+        } else {
+          return path.dirname(cleanPath);
+        }
+      }
+    }
+  } catch (e) {}
+
+  // 默认回退到系统“我的文档”目录
+  const docDir = path.join(os.homedir(), 'Documents');
+  if (fs.existsSync(docDir)) {
+    return docDir;
+  }
+  return os.homedir();
+}
+
+/**
  * 调用 Windows 原生文件选择对话框
  */
-export function openNativeFilePicker(title = '请选择 llama-server.exe 文件', filter = '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*') {
+export function openNativeFilePicker(
+  title = '请选择 llama-server.exe 文件', 
+  filter = '可执行文件 (*.exe)|*.exe|所有文件 (*.*)|*.*',
+  initialPath = ''
+) {
+  const initialDir = resolveInitialDir(initialPath);
+  let initialFile = '';
+  if (initialPath && typeof initialPath === 'string' && fs.existsSync(initialPath)) {
+    try {
+      const stat = fs.statSync(initialPath);
+      if (stat.isFile()) {
+        initialFile = path.basename(initialPath);
+      }
+    } catch (e) {}
+  }
+
   const script = `
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
 $d = New-Object System.Windows.Forms.OpenFileDialog
 $d.Title = "${title.replace(/"/g, '`"')}"
 $d.Filter = "${filter.replace(/"/g, '`"')}"
 $d.CheckFileExists = $true
+$d.RestoreDirectory = $true
+$initDir = "${initialDir.replace(/"/g, '`"')}"
+if (Test-Path -Path $initDir) {
+  $d.InitialDirectory = $initDir
+} else {
+  $d.InitialDirectory = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::MyDocuments)
+}
+${initialFile ? `$d.FileName = "${initialFile.replace(/"/g, '`"')}"` : ''}
 $f = New-Object System.Windows.Forms.Form
 $f.TopMost = $true
 if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
-  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
   [Console]::WriteLine($d.FileName)
 }
+$f.Dispose()
+$d.Dispose()
 `;
   return runPowerShellPicker(script);
 }
 
 /**
- * 调用 Windows 原生文件夹选择对话框
+ * 调用 Windows 原生文件夹选择对话框（采用与文件选择相同的新版 Windows 资源管理器风格对话框）
  */
-export function openNativeFolderPicker(title = '请选择本地 GGUF 模型存储目录') {
+export function openNativeFolderPicker(
+  title = '请选择本地 GGUF 模型存储目录',
+  initialPath = ''
+) {
+  const initialDir = resolveInitialDir(initialPath);
+
   const script = `
-Add-Type -AssemblyName System.Windows.Forms
-$d = New-Object System.Windows.Forms.FolderBrowserDialog
-$d.Description = "${title.replace(/"/g, '`"')}"
-$d.ShowNewFolderButton = $true
-$f = New-Object System.Windows.Forms.Form
-$f.TopMost = $true
-if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
-  [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-  [Console]::WriteLine($d.SelectedPath)
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$code = @"
+using System;
+using System.Runtime.InteropServices;
+using System.IO;
+
+namespace ModernDialog {
+    public class FolderPicker {
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+        public static extern void SHCreateItemFromParsingName(
+            [In, MarshalAs(UnmanagedType.LPWStr)] string pszPath,
+            [In] IntPtr pbc,
+            [In, MarshalAs(UnmanagedType.LPStruct)] Guid riid,
+            [Out, MarshalAs(UnmanagedType.Interface)] out IShellItem ppv);
+
+        [ComImport]
+        [Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        public interface IShellItem {
+            void BindToHandler([In] IntPtr pbc, [In, MarshalAs(UnmanagedType.LPStruct)] Guid bhid, [In, MarshalAs(UnmanagedType.LPStruct)] Guid riid, out IntPtr ppv);
+            void GetParent([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
+            void GetDisplayName([In] uint sigdnName, [MarshalAs(UnmanagedType.LPWStr)] out string ppszName);
+            void GetAttributes([In] uint sfgaoMask, out uint psfgaoAttribs);
+            void Compare([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi, [In] uint hint, out int piOrder);
+        }
+
+        [ComImport]
+        [Guid("42f85136-db7e-439c-85f1-e4075d135fc8")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        public interface IFileOpenDialog {
+            [PreserveSig] int Show([In] IntPtr parent);
+            void SetFileTypes([In] uint cFileTypes, [In] IntPtr rgFilterSpec);
+            void SetFileTypeIndex([In] uint iFileType);
+            void GetFileTypeIndex(out uint piFileType);
+            void Advise([In, MarshalAs(UnmanagedType.Interface)] IntPtr pfde, out uint pdwCookie);
+            void Unadvise([In] uint dwCookie);
+            void SetOptions([In] uint fos);
+            void GetOptions(out uint pfos);
+            void SetDefaultFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
+            void SetFolder([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi);
+            void GetFolder([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
+            void GetCurrentSelection([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
+            void SetFileName([In, MarshalAs(UnmanagedType.LPWStr)] string pszName);
+            void GetFileName([MarshalAs(UnmanagedType.LPWStr)] out string pszName);
+            void SetTitle([In, MarshalAs(UnmanagedType.LPWStr)] string pszTitle);
+            void SetOkButtonLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszText);
+            void SetFileNameLabel([In, MarshalAs(UnmanagedType.LPWStr)] string pszLabel);
+            void GetResult([MarshalAs(UnmanagedType.Interface)] out IShellItem ppsi);
+            void AddPlace([In, MarshalAs(UnmanagedType.Interface)] IShellItem psi, int fdap);
+            void SetDefaultExtension([In, MarshalAs(UnmanagedType.LPWStr)] string pszDefaultExtension);
+            void Close([MarshalAs(UnmanagedType.Error)] int hr);
+            void SetClientGuid([In, MarshalAs(UnmanagedType.LPStruct)] Guid guid);
+            void ClearClientData();
+            void SetFilter([MarshalAs(UnmanagedType.Interface)] IntPtr pFilter);
+            void GetResults([MarshalAs(UnmanagedType.Interface)] out IntPtr ppenum);
+            void GetSelectedItems([MarshalAs(UnmanagedType.Interface)] out IntPtr ppsai);
+        }
+
+        [ComImport]
+        [Guid("DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7")]
+        [ClassInterface(ClassInterfaceType.None)]
+        public class FileOpenDialogRCW {}
+
+        public static string ShowDialog(string title, string initialDir) {
+            var dialog = (IFileOpenDialog)new FileOpenDialogRCW();
+            try {
+                uint options;
+                dialog.GetOptions(out options);
+                // FOS_PICKFOLDERS = 0x20, FOS_FORCEFILESYSTEM = 0x40, FOS_PATHMUSTEXIST = 0x800
+                dialog.SetOptions(options | 0x00000020 | 0x00000040 | 0x00000800);
+                
+                if (!string.IsNullOrEmpty(title)) {
+                    dialog.SetTitle(title);
+                }
+
+                string targetDir = initialDir;
+                if (string.IsNullOrEmpty(targetDir) || !Directory.Exists(targetDir)) {
+                    targetDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                }
+
+                if (!string.IsNullOrEmpty(targetDir) && Directory.Exists(targetDir)) {
+                    Guid riid = new Guid("43826D1E-E718-42EE-BC55-A1E261C37BFE");
+                    IShellItem folderItem;
+                    SHCreateItemFromParsingName(targetDir, IntPtr.Zero, riid, out folderItem);
+                    if (folderItem != null) {
+                        dialog.SetFolder(folderItem);
+                        dialog.SetDefaultFolder(folderItem);
+                    }
+                }
+
+                int hr = dialog.Show(IntPtr.Zero);
+                if (hr == 0) {
+                    IShellItem item;
+                    dialog.GetResult(out item);
+                    if (item != null) {
+                        string path;
+                        item.GetDisplayName(0x80058000, out path); // SIGDN_FILESYSPATH
+                        return path;
+                    }
+                }
+                return null;
+            } catch {
+                return null;
+            } finally {
+                try {
+                    Marshal.ReleaseComObject(dialog);
+                } catch {}
+            }
+        }
+    }
+}
+"@
+
+try {
+    Add-Type -TypeDefinition $code -ErrorAction Stop
+    $result = [ModernDialog.FolderPicker]::ShowDialog("${title.replace(/"/g, '`"')}", "${initialDir.replace(/"/g, '`"')}")
+    if ($result) {
+        [Console]::WriteLine($result)
+    }
+} catch {
+    # 兼容性降级
+    Add-Type -AssemblyName System.Windows.Forms
+    $d = New-Object System.Windows.Forms.FolderBrowserDialog
+    $d.Description = "${title.replace(/"/g, '`"')}"
+    $d.ShowNewFolderButton = $true
+    $initDir = "${initialDir.replace(/"/g, '`"')}"
+    if (Test-Path -Path $initDir) {
+        $d.SelectedPath = $initDir
+    } else {
+        $d.SelectedPath = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::MyDocuments)
+    }
+    $f = New-Object System.Windows.Forms.Form
+    $f.TopMost = $true
+    if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
+        [Console]::WriteLine($d.SelectedPath)
+    }
+    $f.Dispose()
+    $d.Dispose()
 }
 `;
   return runPowerShellPicker(script);
@@ -235,11 +421,27 @@ if ($d.ShowDialog($f) -eq [System.Windows.Forms.DialogResult]::OK) {
  */
 export async function browseFilesystem(targetPath = '') {
   try {
-    let current = targetPath ? path.resolve(targetPath) : '';
-    
-    // 如果未提供路径或路径无效，返回盘符列表 (Windows) 或根目录
+    let current = '';
+
+    // 特殊指令或无效路径处理
+    if (targetPath === '__DOCUMENTS__') {
+      current = path.join(os.homedir(), 'Documents');
+    } else if (targetPath && fs.existsSync(targetPath)) {
+      current = path.resolve(targetPath);
+    } else if (targetPath) {
+      // 传入了非空但不存在的路径，回退到系统“文档”目录
+      const docDir = path.join(os.homedir(), 'Documents');
+      if (fs.existsSync(docDir)) {
+        current = docDir;
+      }
+    }
+
+    // 如果仍未解析到有效路径，默认定位到系统“文档”目录，再回退到盘符列表
     if (!current || !fs.existsSync(current)) {
-      if (process.platform === 'win32') {
+      const docDir = path.join(os.homedir(), 'Documents');
+      if (fs.existsSync(docDir)) {
+        current = docDir;
+      } else if (process.platform === 'win32') {
         const drives = ['C:\\', 'D:\\', 'E:\\', 'F:\\', 'G:\\', 'H:\\'].filter(d => fs.existsSync(d));
         return {
           success: true,
@@ -249,7 +451,7 @@ export async function browseFilesystem(targetPath = '') {
           items: drives.map(d => ({ name: d, path: d, isDir: true, isDrive: true }))
         };
       } else {
-        current = '/';
+        current = os.homedir() || '/';
       }
     }
 

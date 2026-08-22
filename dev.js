@@ -20,8 +20,8 @@ if (!fs.existsSync(viteScript)) {
   viteScript = 'vite';
 }
 
-// 1. 启动 Express 后端 API (Port 5175)
-const serverProcess = spawn(nodeExec, [serverScript], {
+// 1. 启动 Express 后端 API (Port 5175, 支持热重载)
+const serverProcess = spawn(nodeExec, ['--watch', serverScript], {
   cwd: __dirname,
   stdio: 'inherit',
   env: { ...process.env, PORT: '5175' }
