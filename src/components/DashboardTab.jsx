@@ -310,6 +310,7 @@ export default function DashboardTab({
                 </h2>
                 {isRunning && <span className="badge badge-emerald">HEALTHY</span>}
                 {isStarting && <span className="badge badge-amber">LOADING</span>}
+                <span className="badge badge-primary">CUDA 13.3</span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px', fontSize: '13px', color: 'var(--text-muted)' }}>

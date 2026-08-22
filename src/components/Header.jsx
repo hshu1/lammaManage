@@ -62,32 +62,11 @@ export default function Header({
           flexWrap: 'wrap',
           gap: '16px'
         }}>
-          {/* 左侧 Logo 与 标题 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 0 16px rgba(14, 165, 233, 0.35)',
-              fontSize: '20px'
-            }}>
-              🦙
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <h1 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.02em' }} className="gradient-text">
-                  Llama.cpp 控制台
-                </h1>
-                <span className="badge badge-primary" style={{ fontSize: '10px' }}>CUDA 13.3</span>
-              </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
-                本地大模型调度 · 极简 WebUI · HuggingFace 镜像极速下载
-              </p>
-            </div>
+          {/* 左侧标题 */}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <h1 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 }} className="gradient-text">
+              Llama.cpp 控制台
+            </h1>
           </div>
 
           {/* 中间 服务状态胶囊 */}
@@ -117,16 +96,7 @@ export default function Header({
 
             {isRunning && (
               <>
-                <span style={{ color: 'var(--border-color)' }}>|</span>
-                <span style={{ 
-                  color: 'var(--text-muted)', 
-                  maxWidth: '180px', 
-                  overflow: 'hidden', 
-                  textOverflow: 'ellipsis', 
-                  whiteSpace: 'nowrap' 
-                }}>
-                  {serverStatus.activeModel}
-                </span>
+
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     onClick={copyEndpoint}
@@ -155,6 +125,21 @@ export default function Header({
 
           {/* 右侧 快速操作 & 主题切换器 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={onQuickAddClick}
+              className="btn btn-secondary"
+              style={{
+                borderColor: 'var(--primary)',
+                background: 'transparent',
+                color: 'var(--primary)',
+                fontSize: '13px',
+                padding: '6px 14px'
+              }}
+            >
+              <Plus size={15} />
+              添加 / 下载 HF 模型
+            </button>
+
             {/* 三态主题切换胶囊 (系统/Dark/Light) */}
             <div 
               style={{
@@ -185,10 +170,9 @@ export default function Header({
                       border: 'none',
                       cursor: 'pointer',
                       background: isActive 
-                        ? 'linear-gradient(135deg, var(--c-llama-sky) 0%, var(--c-emerald) 100%)' 
+                        ? 'var(--primary)' 
                         : 'transparent',
-                      color: isActive ? 'var(--c-canvas-light)' : 'var(--text-muted)',
-                      boxShadow: isActive ? '0 2px 8px rgba(14, 165, 233, 0.25)' : 'none',
+                      color: isActive ? '#FFFFFF' : 'var(--text-muted)',
                       transition: 'all 0.15s ease'
                     }}
                     title={opt.title}
@@ -199,21 +183,6 @@ export default function Header({
                 );
               })}
             </div>
-
-            <button
-              onClick={onQuickAddClick}
-              className="btn btn-secondary"
-              style={{
-                borderColor: 'rgba(14, 165, 233, 0.35)',
-                background: 'rgba(14, 165, 233, 0.08)',
-                color: 'var(--c-llama-sky)',
-                fontSize: '13px',
-                padding: '6px 14px'
-              }}
-            >
-              <Plus size={15} />
-              添加 / 下载 HF 模型
-            </button>
           </div>
         </div>
 
