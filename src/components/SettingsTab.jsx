@@ -28,7 +28,9 @@ import { api } from '../api/client.js';
 import FileBrowserModal from './FileBrowserModal.jsx';
 import { PALETTE_COLORS, THEME_OPTIONS, GRADIENT_SPECS } from '../theme/themeConfig.js';
 
-export default function SettingsTab({
+export default function SettingsModal({
+  isOpen,
+  onClose,
   config,
   configMeta = {},
   theme = 'system',
@@ -281,8 +283,26 @@ for chunk in response:
     "temperature": 0.7
   }'`;
 
+  if (!isOpen) return null;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center',
+      padding: '40px'
+    }}>
+      <div className="glass-panel" style={{
+        width: '100%', maxWidth: '800px', maxHeight: '100%', overflowY: 'auto',
+        position: 'relative', padding: '24px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800 }}>⚙️ 系统设置</h2>
+          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px' }}>
+            ✕
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
       {/* 2. 路径与网络核心配置 */}
       <div className="glass-panel" style={{ padding: '24px' }}>
@@ -649,6 +669,8 @@ for chunk in response:
         }}
         addToast={addToast}
       />
+    </div>
+      </div>
     </div>
   );
 }

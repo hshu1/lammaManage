@@ -17,27 +17,12 @@ import {
 } from 'lucide-react';
 
 export default function Header({ 
-  activeTab, 
-  setActiveTab, 
-  serverStatus, 
-  modelsCount, 
   theme = 'system',
   onThemeChange,
-  onQuickAddClick,
+  onDownloadClick,
+  onSettingsClick,
   addToast 
 }) {
-  const isRunning = serverStatus?.status === 'RUNNING';
-  const isStarting = serverStatus?.status === 'STARTING';
-  const isError = serverStatus?.status === 'ERROR';
-
-  const copyEndpoint = (e) => {
-    e.stopPropagation();
-    if (serverStatus?.endpoint) {
-      navigator.clipboard.writeText(serverStatus.endpoint);
-      addToast({ type: 'success', title: '已复制', message: `接口地址 ${serverStatus.endpoint} 已复制到剪贴板` });
-    }
-  };
-
   const themeOptions = [
     { id: 'system', label: '系统', icon: <Monitor size={13} />, title: '跟随系统色彩偏好' },
     { id: 'dark', label: 'Dark', icon: <Moon size={13} />, title: '暗色极简主题' },
@@ -69,64 +54,24 @@ export default function Header({
             </h1>
           </div>
 
-          {/* 中间 服务状态胶囊 */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            background: 'var(--bg-card)',
-            padding: '6px 14px',
-            borderRadius: '999px',
-            border: '1px solid var(--border-color)',
-            fontSize: '13px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {isRunning && <span className="status-dot-green" />}
-              {isStarting && <span className="status-dot-amber" />}
-              {isError && <span className="status-dot-red" />}
-              {!isRunning && !isStarting && !isError && <span className="status-dot-gray" />}
-
-              <span style={{ 
-                fontWeight: 600, 
-                color: isRunning ? 'var(--c-emerald)' : isStarting ? 'var(--c-amber)' : isError ? 'var(--c-rose)' : 'var(--text-muted)' 
-              }}>
-                {isRunning ? `服务运行中 (:${serverStatus.port})` : isStarting ? '正在加载模型...' : isError ? '服务异常' : '服务未启动'}
-              </span>
-            </div>
-
-            {isRunning && (
-              <>
-
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    onClick={copyEndpoint}
-                    title="复制 API 端点"
-                    className="btn btn-ghost"
-                    style={{ padding: '3px 8px', height: '24px', fontSize: '11px', borderRadius: '6px' }}
-                  >
-                    <Copy size={12} />
-                    端点
-                  </button>
-                  <a
-                    href={serverStatus.endpoint}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="在浏览器中打开原生 llama.cpp WebUI"
-                    className="btn btn-primary"
-                    style={{ padding: '3px 8px', height: '24px', fontSize: '11px', borderRadius: '6px', textDecoration: 'none' }}
-                  >
-                    <ExternalLink size={12} />
-                    WebUI
-                  </a>
-                </div>
-              </>
-            )}
-          </div>
-
           {/* 右侧 快速操作 & 主题切换器 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            
             <button
-              onClick={onQuickAddClick}
+              onClick={onSettingsClick}
+              className="btn btn-ghost"
+              style={{
+                fontSize: '13px',
+                padding: '6px 14px'
+              }}
+              title="系统设置"
+            >
+              <Settings size={15} />
+              设置
+            </button>
+            
+            <button
+              onClick={onDownloadClick}
               className="btn btn-secondary"
               style={{
                 borderColor: 'var(--primary)',
@@ -137,7 +82,7 @@ export default function Header({
               }}
             >
               <Plus size={15} />
-              添加 / 下载 HF 模型
+              添加模型
             </button>
 
             {/* 三态主题切换胶囊 (系统/Dark/Light) */}
@@ -151,7 +96,7 @@ export default function Header({
                 padding: '2px',
                 gap: '2px'
               }}
-              title="切换界面风格 (系统 / 暗色 / 亮色)"
+              title="切换界面风格"
             >
               {themeOptions.map((opt) => {
                 const isActive = theme === opt.id;
@@ -185,62 +130,6 @@ export default function Header({
             </div>
           </div>
         </div>
-
-        {/* 下方 Tab 导航条 */}
-        <nav style={{
-          display: 'flex',
-          gap: '8px',
-          marginTop: '12px',
-          borderTop: '1px solid var(--border-color)',
-          paddingTop: '10px',
-          overflowX: 'auto'
-        }}>
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: '10px' }}
-          >
-            <Server size={15} />
-            🚀 服务控制台
-          </button>
-
-          <button
-            onClick={() => setActiveTab('models')}
-            className={`btn ${activeTab === 'models' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: '10px' }}
-          >
-            <HardDrive size={15} />
-            📦 本地模型库
-            {modelsCount > 0 && (
-              <span style={{
-                background: activeTab === 'models' ? 'rgba(255,255,255,0.2)' : 'rgba(100, 116, 139, 0.2)',
-                padding: '1px 6px',
-                borderRadius: '999px',
-                fontSize: '11px'
-              }}>
-                {modelsCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveTab('download')}
-            className={`btn ${activeTab === 'download' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: '10px' }}
-          >
-            <DownloadCloud size={15} />
-            🌐 HF 下载与收藏中心
-          </button>
-
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ borderRadius: '10px' }}
-          >
-            <Settings size={15} />
-            ⚙️ 系统与接口设置
-          </button>
-        </nav>
       </div>
     </header>
   );

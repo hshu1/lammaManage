@@ -20,7 +20,9 @@ import {
 import { parseHfCommand } from '../utils/hfParser.js';
 import { formatDuration } from '../utils/formatters.js';
 
-export default function DownloadTab({
+export default function DownloadModal({
+  isOpen,
+  onClose,
   config,
   models = [],
   bookmarks = [],
@@ -116,9 +118,26 @@ export default function DownloadTab({
     return true;
   });
 
+  if (!isOpen) return null;
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* 顶部：智能输入与下载解析器 */}
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+      zIndex: 1000, display: 'flex', justifyContent: 'center', alignItems: 'center',
+      padding: '40px'
+    }}>
+      <div className="glass-panel" style={{
+        width: '100%', maxWidth: '800px', maxHeight: '100%', overflowY: 'auto',
+        position: 'relative', padding: '24px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800 }}>☁️ HF 模型下载中心</h2>
+          <button onClick={onClose} className="btn btn-ghost" style={{ padding: '6px' }}>
+            ✕
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div className="glass-panel" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
           <DownloadCloud size={24} style={{ color: '#38bdf8' }} />
@@ -510,6 +529,8 @@ export default function DownloadTab({
             })}
           </div>
         )}
+        </div>
+        </div>
       </div>
     </div>
   );

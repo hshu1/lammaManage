@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header.jsx';
-import DashboardTab from './components/DashboardTab.jsx';
-import ModelsTab from './components/ModelsTab.jsx';
-import DownloadTab from './components/DownloadTab.jsx';
-import SettingsTab from './components/SettingsTab.jsx';
+import HomeView from './components/HomeView.jsx';
+
+import DownloadModal from './components/DownloadTab.jsx';
+import SettingsModal from './components/SettingsTab.jsx';
 import QuickAddModal from './components/QuickAddModal.jsx';
 import ToastContainer from './components/Toast.jsx';
 import { api } from './api/client.js';
 import { resolveActualTheme } from './theme/themeConfig.js';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+
   const [theme, setTheme] = useState(() => localStorage.getItem('lamma_theme') || 'system');
   const [config, setConfig] = useState(null);
   const [configMeta, setConfigMeta] = useState({ isCustomized: false, overriddenKeys: [] });
@@ -235,7 +238,7 @@ export default function App() {
         modelFilename: filename,
         params: config?.launchParams
       });
-      setActiveTab('dashboard');
+      
       addToast({ type: 'success', title: '已切换模型', message: `正在启动 ${filename}...` });
     } catch (e) {
       addToast({ type: 'error', title: '启动失败', message: e.message });
@@ -379,80 +382,59 @@ export default function App() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部导航 */}
       <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        serverStatus={serverStatus}
-        modelsCount={models.length}
         theme={theme}
         onThemeChange={handleThemeChange}
-        onQuickAddClick={() => setIsQuickAddOpen(true)}
+        onDownloadClick={() => setIsDownloadOpen(true)}
+        onSettingsClick={() => setIsSettingsOpen(true)}
         addToast={addToast}
       />
 
-      {/* 主体内容 */}
+            {/* 主体内容 */}
       <main className="app-container" style={{ flex: 1, padding: '24px' }}>
         {config && (
-          <>
-            {activeTab === 'dashboard' && (
-              <DashboardTab
-                config={config}
-                models={models}
-                serverStatus={serverStatus}
-                logs={logs}
-                onStartServer={handleStartServer}
-                onStopServer={handleStopServer}
-                onRestartServer={handleRestartServer}
-                onClearLogs={() => setLogs([])}
-                addToast={addToast}
-                onNavigateToModels={() => setActiveTab('models')}
-              />
-            )}
-
-            {activeTab === 'models' && (
-              <ModelsTab
-                models={models}
-                config={config}
-                serverStatus={serverStatus}
-                onRefreshModels={fetchModels}
-                onStartModel={handleStartSpecificModel}
-                onDeleteModel={handleDeleteModel}
-                onOpenFolder={handleOpenFolder}
-                onNavigateToDownload={() => setActiveTab('download')}
-                addToast={addToast}
-              />
-            )}
-
-            {activeTab === 'download' && (
-              <DownloadTab
-                config={config}
-                models={models}
-                bookmarks={bookmarks}
-                downloadJobs={downloadJobs}
-                onStartDownload={handleStartDownload}
-                onCancelDownload={handleCancelDownload}
-                onSaveBookmark={handleSaveBookmark}
-                onDeleteBookmark={handleDeleteBookmark}
-                onResetBookmarks={handleResetBookmarks}
-                onStartModel={handleStartSpecificModel}
-                addToast={addToast}
-              />
-            )}
-
-            {activeTab === 'settings' && (
-              <SettingsTab
-                config={config}
-                configMeta={configMeta}
-                theme={theme}
-                onThemeChange={handleThemeChange}
-                onSaveConfig={handleSaveConfig}
-                onResetConfig={handleResetConfig}
-                onOpenFolder={handleOpenFolder}
-                addToast={addToast}
-              />
-            )}
-          </>
+          <HomeView
+            config={config}
+            models={models}
+            serverStatus={serverStatus}
+            logs={logs}
+            onStartServer={handleStartServer}
+            onStopServer={handleStopServer}
+            onRestartServer={handleRestartServer}
+            onClearLogs={() => setLogs([])}
+            addToast={addToast}
+          />
         )}
       </main>
+
+      {/* Modals */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        config={config}
+        configMeta={configMeta}
+        theme={theme}
+        onThemeChange={handleThemeChange}
+        onSaveConfig={handleSaveConfig}
+        onResetConfig={handleResetConfig}
+        onOpenFolder={handleOpenFolder}
+        addToast={addToast}
+      />
+
+      <DownloadModal
+        isOpen={isDownloadOpen}
+        onClose={() => setIsDownloadOpen(false)}
+        config={config}
+        models={models}
+        bookmarks={bookmarks}
+        downloadJobs={downloadJobs}
+        onStartDownload={handleStartDownload}
+        onCancelDownload={handleCancelDownload}
+        onSaveBookmark={handleSaveBookmark}
+        onDeleteBookmark={handleDeleteBookmark}
+        onResetBookmarks={handleResetBookmarks}
+        onStartModel={handleStartSpecificModel}
+        addToast={addToast}
+      />
 
       {/* 快捷弹窗 */}
       <QuickAddModal
