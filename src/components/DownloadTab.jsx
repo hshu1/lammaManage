@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Sparkles,
   ArrowRight,
-  Filter
+  Filter,
+  RotateCcw
 } from 'lucide-react';
 import { parseHfCommand } from '../utils/hfParser.js';
 import { formatDuration } from '../utils/formatters.js';
@@ -28,6 +29,7 @@ export default function DownloadTab({
   onCancelDownload,
   onSaveBookmark,
   onDeleteBookmark,
+  onResetBookmarks,
   onStartModel,
   addToast
 }) {
@@ -91,6 +93,19 @@ export default function DownloadTab({
     const cmd = `hf download hf://${bm.repoId}/${bm.filename}`;
     navigator.clipboard.writeText(cmd);
     addToast?.({ type: 'success', title: '已复制命令', message: cmd });
+  };
+
+  const handleResetDefaultBookmarks = async () => {
+    if (!window.confirm('确定要将收藏夹重置为出厂默认的推荐模型列表 (JSON 模板) 吗？')) {
+      return;
+    }
+    try {
+      if (onResetBookmarks) {
+        await onResetBookmarks();
+      }
+    } catch (e) {
+      addToast?.({ type: 'error', title: '重置失败', message: e.message });
+    }
   };
 
   // 过滤收藏夹
@@ -314,10 +329,33 @@ export default function DownloadTab({
           gap: '12px',
           marginBottom: '20px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Bookmark size={20} style={{ color: '#a855f7' }} />
-            <h3 style={{ fontSize: '18px', fontWeight: 800 }}>模型收藏夹</h3>
-            <span className="badge badge-purple">{bookmarks.length}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Bookmark size={20} style={{ color: '#a855f7' }} />
+              <h3 style={{ fontSize: '18px', fontWeight: 800 }}>模型收藏夹</h3>
+              <span className="badge badge-purple">{bookmarks.length}</span>
+            </div>
+
+            {/* 恢复出厂默认推荐按钮 */}
+            <button
+              type="button"
+              onClick={handleResetDefaultBookmarks}
+              className="btn btn-ghost"
+              style={{
+                padding: '4px 10px',
+                fontSize: '12px',
+                color: '#c084fc',
+                borderColor: 'rgba(192, 132, 252, 0.3)',
+                background: 'rgba(192, 132, 252, 0.08)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+              title="一键将收藏夹重置为出厂默认的推荐模型列表 (bookmarks.default.json)"
+            >
+              <RotateCcw size={13} />
+              恢复默认推荐
+            </button>
           </div>
 
           {/* 状态过滤器 */}

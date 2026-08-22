@@ -131,15 +131,19 @@ D:\99_lamma\lammaManage\
 ├── index.html                 # 前端 HTML 入口
 ├── README.md                  # 项目使用与说明文档
 │
-├── server/                    # 后端服务源码 (Node.js Express)
+├── server/                    # 后端服务源码 (Node.js Express + SQLite)
 │   ├── index.js               # Express 主服务 (API 路由、静态托管、SSE 事件流)
+│   ├── db.js                  # SQLite 存储层 (node:sqlite 原生数据库操作与迁移)
+│   ├── configManager.js       # 配置管理器 (SQLite 个人参数覆盖 + JSON 初始参数分层)
 │   ├── llamaManager.js        # Llama-server 进程生命周期与日志管理
 │   ├── modelManager.js        # 本地 GGUF 模型扫描与元数据解析
 │   ├── hfDownloader.js        # HuggingFace 链接解析与下载任务管理
 │   ├── download_worker.py     # Python 极速镜像多线程下载脚本
-│   ├── config.json            # 路径与预设方案持久化配置
-│   └── data/
-│       └── bookmarks.json     # 模型收藏夹数据
+│   ├── defaultConfig/         # 📦 出厂初始化基准数据 (只读 JSON)
+│   │   ├── config.default.json
+│   │   └── bookmarks.default.json
+│   └── config/                # 💾 运行时个人参数与数据库 (动态 SQLite)
+│       └── lamma.db
 │
 └── src/                       # 前端源码 (React + Vite)
     ├── main.jsx               # React 应用挂载入口

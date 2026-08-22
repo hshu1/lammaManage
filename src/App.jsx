@@ -11,6 +11,7 @@ import { api } from './api/client.js';
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [config, setConfig] = useState(null);
+  const [configMeta, setConfigMeta] = useState({ isCustomized: false, overriddenKeys: [] });
   const [models, setModels] = useState([]);
   const [bookmarks, setBookmarks] = useState([]);
   const [downloadJobs, setDownloadJobs] = useState([]);
@@ -37,6 +38,10 @@ export default function App() {
       const res = await api.getConfig();
       if (res.success) {
         setConfig(res.config);
+        setConfigMeta({
+          isCustomized: res.isCustomized || false,
+          overriddenKeys: res.overriddenKeys || []
+        });
       }
     } catch (e) {
       console.error('Error fetching config:', e);
@@ -230,7 +235,54 @@ export default function App() {
     const res = await api.saveConfig(newConfig);
     if (res.success) {
       setConfig(res.config);
+      setConfigMeta({
+        isCustomized: res.isCustomized || false,
+        overriddenKeys: res.overriddenKeys || []
+      });
       await fetchModels();
+    }
+  };
+
+  // 重置系统配置回初始化参数
+  const handleResetConfig = async () => {
+    try {
+      const res = await api.resetConfig();
+      if (res.success) {
+        setConfig(res.config);
+        setConfigMeta({
+          isCustomized: false,
+          overriddenKeys: []
+        });
+        await fetchModels();
+        addToast({
+          type: 'success',
+          title: '已重置配置',
+          message: '已清空 SQLite 个人参数，系统已恢复为 JSON 出厂初始化配置！'
+        });
+      }
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: '重置失败',
+        message: e.message
+      });
+    }
+  };
+
+  // 一键重置收藏夹为出厂默认
+  const handleResetBookmarks = async () => {
+    try {
+      const res = await api.resetBookmarks();
+      if (res.success) {
+        setBookmarks(res.bookmarks || []);
+        addToast({
+          type: 'success',
+          title: '已重置收藏夹',
+          message: '已成功恢复出厂默认推荐模型收藏列表！'
+        });
+      }
+    } catch (e) {
+      addToast({ type: 'error', title: '重置失败', message: e.message });
     }
   };
 
@@ -333,6 +385,7 @@ export default function App() {
                 onCancelDownload={handleCancelDownload}
                 onSaveBookmark={handleSaveBookmark}
                 onDeleteBookmark={handleDeleteBookmark}
+                onResetBookmarks={handleResetBookmarks}
                 onStartModel={handleStartSpecificModel}
                 addToast={addToast}
               />
@@ -341,7 +394,9 @@ export default function App() {
             {activeTab === 'settings' && (
               <SettingsTab
                 config={config}
+                configMeta={configMeta}
                 onSaveConfig={handleSaveConfig}
+                onResetConfig={handleResetConfig}
                 onOpenFolder={handleOpenFolder}
                 addToast={addToast}
               />

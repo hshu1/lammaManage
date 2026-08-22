@@ -1,20 +1,20 @@
 {
-  "executablePath": "D:\\99_lamma\\lamma\\llama-b9994-bin-win-cuda-13.3-x64\\llama-server.exe",
-  "modelsPath": "D:\\99_lamma\\models",
+  "executablePath": "",
+  "modelsPath": "",
   "defaultHost": "127.0.0.1",
   "defaultPort": 8080,
   "hfMirror": "https://hf-mirror.com",
   "hfToken": "",
-  "activeModel": "qwen3.8-9b-heretic-uncensored-q5_0.gguf",
+  "activeModel": "",
   "launchParams": {
     "nGpuLayers": 99,
-    "ctxSize": 32768,
+    "ctxSize": 8000,
     "threads": 8,
     "parallel": 1,
-    "flashAttn": true,
-    "cacheTypeK": "q8_0",
-    "cacheTypeV": "q8_0",
-    "mcpProxy": true,
+    "flashAttn": false,
+    "cacheTypeK": "f16",
+    "cacheTypeV": "f16",
+    "mcpProxy": false,
     "extraArgs": ""
   },
   "presets": [

@@ -1,2 +1,19 @@
 node_modules/
 dist/
+
+# SQLite 个人数据库及 WAL / SHM 日志文件 (易变数据忽略，避免提交个人数据)
+server/config/lamma.db
+server/config/lamma.db-wal
+server/config/lamma.db-shm
+server/config/*.db*
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Python 缓存与系统日志
+__pycache__/
+*.pyc
+*.log
+.DS_Store

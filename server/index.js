@@ -15,6 +15,20 @@ import {
   browseFilesystem
 } from './modelManager.js';
 import { hfDownloader, parseHfInput } from './hfDownloader.js';
+import { 
+  getEffectiveConfig, 
+  saveUserConfig, 
+  resetToDefaultConfig,
+  searchForLlamaServer, 
+  searchForModelsDir 
+} from './configManager.js';
+import { 
+  getAllBookmarks, 
+  saveBookmark, 
+  deleteBookmark, 
+  updateBookmarkSize,
+  resetBookmarksToDefault
+} from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,12 +39,12 @@ const PORT = process.env.PORT || 5175;
 app.use(cors());
 app.use(express.json());
 
-const CONFIG_PATH = path.join(__dirname, 'config.json');
-const BOOKMARKS_PATH = path.join(__dirname, 'data', 'bookmarks.json');
-
-// 确保数据目录存在
-if (!fs.existsSync(path.join(__dirname, 'data'))) {
-  fs.mkdirSync(path.join(__dirname, 'data'), { recursive: true });
+// 确保配置与默认配置目录存在
+if (!fs.existsSync(path.join(__dirname, 'config'))) {
+  fs.mkdirSync(path.join(__dirname, 'config'), { recursive: true });
+}
+if (!fs.existsSync(path.join(__dirname, 'defaultConfig'))) {
+  fs.mkdirSync(path.join(__dirname, 'defaultConfig'), { recursive: true });
 }
 
 /**
@@ -70,13 +84,7 @@ async function fetchRemoteFileSize(repoId, filename, endpoint = 'https://hf-mirr
  */
 function syncBookmarksWithSize(bookmarks, modelsPath) {
   if (!Array.isArray(bookmarks)) return [];
-  let changed = false;
   for (const bm of bookmarks) {
-    // 确保默认 size 字段存在且如果不合法则默认为 '未知'
-    if (!bm.size || typeof bm.size !== 'string' || !bm.size.trim()) {
-      bm.size = '未知';
-      changed = true;
-    }
     if (!bm.filename) continue;
     if (modelsPath) {
       const fullPath = path.join(modelsPath, bm.filename);
@@ -86,294 +94,20 @@ function syncBookmarksWithSize(bookmarks, modelsPath) {
           const formatted = formatBytes(stats.size);
           if (bm.size !== formatted) {
             bm.size = formatted;
-            changed = true;
+            updateBookmarkSize(bm.filename, formatted);
           }
         } catch (e) {}
       }
     }
   }
-  if (changed) {
-    saveBookmarks(bookmarks);
-  }
   return bookmarks;
-}
-
-/**
- * 递归检索指定目录下的指定文件 (默认深度 3)
- */
-function findFileInDir(baseDir, filename, maxDepth = 3, currentDepth = 0) {
-  if (!fs.existsSync(baseDir) || currentDepth > maxDepth) return null;
-  try {
-    const entries = fs.readdirSync(baseDir, { withFileTypes: true });
-    // 优先同级查找
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.toLowerCase() === filename.toLowerCase()) {
-        return path.join(baseDir, entry.name);
-      }
-    }
-    // 递归子目录 (忽略隐藏文件夹和 node_modules)
-    for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith('.') && entry.name !== 'node_modules' && entry.name !== 'dist') {
-        const found = findFileInDir(path.join(baseDir, entry.name), filename, maxDepth, currentDepth + 1);
-        if (found) return found;
-      }
-    }
-  } catch (e) {}
-  return null;
-}
-
-/**
- * 自动定位或推导默认的 llama-server 可执行文件路径
- */
-function searchForLlamaServer() {
-  const isWin = process.platform === 'win32';
-  const targetBin = isWin ? 'llama-server.exe' : 'llama-server';
-  const projectRoot = path.resolve(__dirname, '..');
-  const workspaceRoot = path.resolve(projectRoot, '..');
-
-  const candidateBases = [
-    path.join(workspaceRoot, 'lamma'),
-    path.join(workspaceRoot, 'llama'),
-    path.join(workspaceRoot, 'bin'),
-    workspaceRoot,
-    path.join(projectRoot, 'bin'),
-    projectRoot
-  ];
-
-  for (const base of candidateBases) {
-    if (!fs.existsSync(base)) continue;
-    const found = findFileInDir(base, targetBin, 3);
-    if (found) {
-      return found;
-    }
-  }
-
-  // 若均未找到，返回基于当前工作区的相对推导路径
-  return path.join(workspaceRoot, 'lamma', targetBin);
-}
-
-/**
- * 自动定位或推导默认的 models 存储目录
- */
-function searchForModelsDir() {
-  const projectRoot = path.resolve(__dirname, '..');
-  const workspaceRoot = path.resolve(projectRoot, '..');
-
-  const candidates = [
-    path.join(workspaceRoot, 'models'),
-    path.join(projectRoot, 'models'),
-    path.join(workspaceRoot, 'models_gguf'),
-    path.join(projectRoot, 'models_gguf'),
-    path.join(workspaceRoot, 'gguf'),
-    workspaceRoot
-  ];
-
-  for (const dir of candidates) {
-    if (fs.existsSync(dir)) {
-      try {
-        const stats = fs.statSync(dir);
-        if (stats.isDirectory()) {
-          return dir;
-        }
-      } catch (e) {}
-    }
-  }
-
-  // 默认返回项目同级的 models 目录
-  return path.join(workspaceRoot, 'models');
-}
-
-const DEFAULT_PRESETS = [
-  {
-    id: 'daily_8k',
-    name: '日常8196 (8K 基础版)',
-    desc: '全层 GPU 加速，8K 上下文，启动迅速，适合日常极速对话与常规问答。',
-    tags: ['日常对话', '8K', '纯GPU', '默认精度'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 8000 --port 8080',
-    params: {
-      nGpuLayers: 99,
-      ctxSize: 8000,
-      threads: 8,
-      parallel: 1,
-      flashAttn: false,
-      cacheTypeK: 'f16',
-      cacheTypeV: 'f16',
-      mcpProxy: false,
-      extraArgs: ''
-    }
-  },
-  {
-    id: 'scheme_a_32k',
-    name: '方案A: 高频长对话 / 代码重构 (32K)',
-    desc: '适合高频长对话、大型代码重构与中长篇文档总结，开启 Flash Attention 与 Q4 KV 缓存，平衡显存与速度。',
-    tags: ['代码重构', '32K', 'FlashAttn', 'Q4缓存', '中长文档', '纯GPU'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080',
-    params: {
-      nGpuLayers: 99,
-      ctxSize: 32768,
-      threads: 8,
-      parallel: 1,
-      flashAttn: true,
-      cacheTypeK: 'q4_0',
-      cacheTypeV: 'q4_0',
-      mcpProxy: false,
-      extraArgs: ''
-    }
-  },
-  {
-    id: 'scheme_b_hybrid_64k',
-    name: '方案B: CPU+GPU 混合卸载 (极限 64K~128K)',
-    desc: '显存有限但需极限超长上下文，卸载 28 层至 GPU，剩余由 CPU 内存分担，彻底防爆显存。',
-    tags: ['混合卸载', '64K', '超长文本', '低显存占用', 'CPU辅助'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 28 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 -t 8 --port 8080',
-    params: {
-      nGpuLayers: 28,
-      ctxSize: 65536,
-      threads: 8,
-      parallel: 1,
-      flashAttn: true,
-      cacheTypeK: 'q4_0',
-      cacheTypeV: 'q4_0',
-      mcpProxy: false,
-      extraArgs: ''
-    }
-  },
-  {
-    id: 'scheme_c_gpu_64k',
-    name: '方案C: 纯 GPU 满血加速 (64K 顶配)',
-    desc: '大显存显卡专享，全层 GPU 加速 + 64K 超长上下文 + Q4 KV 缓存，极速超长文本推理。',
-    tags: ['纯GPU', '64K', '超长文本', '高性能', 'FlashAttn', 'Q4缓存'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 65536 -np 1 -fa on --cache-type-k q4_0 --cache-type-v q4_0 --port 8080',
-    params: {
-      nGpuLayers: 99,
-      ctxSize: 65536,
-      threads: 8,
-      parallel: 1,
-      flashAttn: true,
-      cacheTypeK: 'q4_0',
-      cacheTypeV: 'q4_0',
-      mcpProxy: false,
-      extraArgs: ''
-    }
-  },
-  {
-    id: 'scheme_d_high_precision_32k',
-    name: '方案D: 极高精度方案 (32K Q8 Cache)',
-    desc: '32K 上下文并启用 Q8_0 高精度量化缓存与 Flash Attention，追求更高注意力精度。',
-    tags: ['高精度', '32K', 'Q8缓存', '代码重构', 'FlashAttn', '纯GPU'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --port 8080',
-    params: {
-      nGpuLayers: 99,
-      ctxSize: 32768,
-      threads: 8,
-      parallel: 1,
-      flashAttn: true,
-      cacheTypeK: 'q8_0',
-      cacheTypeV: 'q8_0',
-      mcpProxy: false,
-      extraArgs: ''
-    }
-  },
-  {
-    id: 'scheme_d_plus_mcp_32k',
-    name: '方案D+: 极高精度 + MCP 智能体 (32K)',
-    desc: '极高精度方案（32k 上下文追求更高注意力精度 + WebUI MCP 代理支持），完美适配智能体工具链。',
-    tags: ['高精度', '32K', 'MCP智能体', 'WebUI扩展', 'Q8缓存', 'FlashAttn', '纯GPU'],
-    rawCommand: './llama-b9994-bin-win-cuda-13.3-x64/llama-server.exe -m ../models/Qwen3.5-9B-DeepSeek-V4-Flash-Q4_K_M.gguf --n-gpu-layers 99 --ctx-size 32768 -np 1 -fa on --cache-type-k q8_0 --cache-type-v q8_0 --webui-mcp-proxy --port 8080',
-    params: {
-      nGpuLayers: 99,
-      ctxSize: 32768,
-      threads: 8,
-      parallel: 1,
-      flashAttn: true,
-      cacheTypeK: 'q8_0',
-      cacheTypeV: 'q8_0',
-      mcpProxy: true,
-      extraArgs: ''
-    }
-  }
-];
-
-function loadConfig() {
-  let config = {};
-  try {
-    if (fs.existsSync(CONFIG_PATH)) {
-      const data = fs.readFileSync(CONFIG_PATH, 'utf-8');
-      config = JSON.parse(data);
-    }
-  } catch (e) {
-    console.error('Error loading config:', e);
-  }
-
-  const defaultExe = searchForLlamaServer();
-  const defaultModels = searchForModelsDir();
-
-  // 如果配置不存在或配置中的路径在当前文件系统不存在，采用相对动态路径
-  let exePath = config.executablePath;
-  if (!exePath || !fs.existsSync(exePath)) {
-    if (exePath && fs.existsSync(path.resolve(__dirname, '..', exePath))) {
-      exePath = path.resolve(__dirname, '..', exePath);
-    } else {
-      exePath = defaultExe;
-    }
-  }
-
-  let modelsDir = config.modelsPath;
-  if (!modelsDir || !fs.existsSync(modelsDir)) {
-    if (modelsDir && fs.existsSync(path.resolve(__dirname, '..', modelsDir))) {
-      modelsDir = path.resolve(__dirname, '..', modelsDir);
-    } else {
-      modelsDir = defaultModels;
-    }
-  }
-
-  return {
-    executablePath: exePath,
-    modelsPath: modelsDir,
-    defaultHost: config.defaultHost || "127.0.0.1",
-    defaultPort: config.defaultPort || 8080,
-    hfMirror: config.hfMirror || "https://hf-mirror.com",
-    hfToken: config.hfToken || "",
-    activeModel: config.activeModel || "",
-    launchParams: config.launchParams || {
-      nGpuLayers: 99,
-      ctxSize: 8000,
-      threads: 8,
-      parallel: 1,
-      flashAttn: false,
-      cacheTypeK: "f16",
-      cacheTypeV: "f16",
-      mcpProxy: false,
-      extraArgs: ""
-    },
-    presets: (config.presets && config.presets.length > 0) ? config.presets : DEFAULT_PRESETS
-  };
-}
-
-function saveConfig(config) {
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
-}
-
-function loadBookmarks() {
-  try {
-    if (fs.existsSync(BOOKMARKS_PATH)) {
-      return JSON.parse(fs.readFileSync(BOOKMARKS_PATH, 'utf-8'));
-    }
-  } catch (e) {
-    console.error('Error reading bookmarks:', e);
-  }
-  return [];
-}
-
-function saveBookmarks(bookmarks) {
-  fs.writeFileSync(BOOKMARKS_PATH, JSON.stringify(bookmarks, null, 2), 'utf-8');
 }
 
 // ----------------- API 路由 -----------------
 
-// 获取与保存系统配置
+// 获取系统配置 (包含 SQLite 个人参数与覆盖状态)
 app.get('/api/config', (req, res) => {
-  const config = loadConfig();
+  const { config, overriddenKeys, isCustomized, initialConfig } = getEffectiveConfig();
   // 检查路径有效性
   const exeExists = fs.existsSync(config.executablePath);
   const modelsDirExists = fs.existsSync(config.modelsPath);
@@ -384,6 +118,8 @@ app.get('/api/config', (req, res) => {
   res.json({
     success: true,
     config,
+    isCustomized,
+    overriddenKeys,
     detected: {
       executablePath: detectedExe,
       modelsPath: detectedModels
@@ -395,16 +131,31 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// 保存用户个人配置 (写入 SQLite 易变参数，不污染 JSON 初始文件)
 app.post('/api/config', (req, res) => {
   try {
-    const current = loadConfig();
-    const newConfig = {
-      ...current,
-      ...req.body,
-      presets: (req.body.presets && req.body.presets.length > 0) ? req.body.presets : current.presets
-    };
-    saveConfig(newConfig);
-    res.json({ success: true, message: '配置已保存', config: newConfig });
+    const { config, overriddenKeys, isCustomized } = saveUserConfig(req.body);
+    res.json({ 
+      success: true, 
+      message: '个人配置已成功保存至 SQLite 存储', 
+      config,
+      isCustomized,
+      overriddenKeys
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 一键恢复出厂默认初始化配置 (清空 SQLite 个人参数，回退为 JSON 初始化参数)
+app.post('/api/config/reset', (req, res) => {
+  try {
+    const { config } = resetToDefaultConfig();
+    res.json({ 
+      success: true, 
+      message: '已恢复出厂默认初始化配置 (JSON)', 
+      config 
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -440,7 +191,7 @@ app.post('/api/config/detect-paths', handleDetectPaths);
 
 // 获取本地模型列表
 app.get('/api/models', async (req, res) => {
-  const config = loadConfig();
+  const { config } = getEffectiveConfig();
   const modelsDir = req.query.dir || config.modelsPath;
   const result = await getLocalModels(modelsDir);
   res.json(result);
@@ -449,7 +200,7 @@ app.get('/api/models', async (req, res) => {
 // 删除本地模型
 app.delete('/api/models/:filename', async (req, res) => {
   try {
-    const config = loadConfig();
+    const { config } = getEffectiveConfig();
     const result = await deleteModelFile(config.modelsPath, req.params.filename);
     res.json(result);
   } catch (e) {
@@ -460,7 +211,7 @@ app.delete('/api/models/:filename', async (req, res) => {
 // 在资源管理器中打开模型所在文件夹
 app.post('/api/models/open-folder', async (req, res) => {
   try {
-    const config = loadConfig();
+    const { config } = getEffectiveConfig();
     const target = req.body.path || config.modelsPath;
     await openInExplorer(target);
     res.json({ success: true });
@@ -509,7 +260,7 @@ app.get('/api/server/status', (req, res) => {
 
 app.post('/api/server/start', async (req, res) => {
   try {
-    const config = loadConfig();
+    const { config } = getEffectiveConfig();
     const {
       executablePath = config.executablePath,
       modelFilename,
@@ -526,10 +277,11 @@ app.post('/api/server/start', async (req, res) => {
       ? modelFilename 
       : path.join(config.modelsPath, modelFilename);
 
-    // 记忆当前激活模型
-    config.activeModel = path.basename(modelPath);
-    config.launchParams = params;
-    saveConfig(config);
+    // 记忆当前激活模型与最新启动参数（写入 SQLite 个人易变参数库）
+    saveUserConfig({
+      activeModel: path.basename(modelPath),
+      launchParams: params
+    });
 
     const result = await llamaManager.startServer({
       executablePath,
@@ -564,31 +316,27 @@ app.post('/api/server/logs/clear', (req, res) => {
   res.json({ success: true });
 });
 
-// 收藏模型管理
+// 收藏模型管理 (SQLite 持久化)
 app.get('/api/bookmarks', async (req, res) => {
-  const config = loadConfig();
-  let bookmarks = loadBookmarks();
+  const { config } = getEffectiveConfig();
+  let bookmarks = getAllBookmarks();
   bookmarks = syncBookmarksWithSize(bookmarks, config.modelsPath);
 
-  // 针对仍然为 "未知" 的条目，异步尝试拉取远程大小并回写（若联网成功则更新，否则保持未知）
+  // 针对仍然为 "未知" 的条目，异步尝试拉取远程大小并回写
   const unknownList = bookmarks.filter(b => (!b.size || b.size === '未知') && b.repoId && b.filename);
   if (unknownList.length > 0) {
     Promise.all(unknownList.map(async (bm) => {
       const remoteSize = await fetchRemoteFileSize(bm.repoId, bm.filename, config.hfMirror);
       if (remoteSize) {
         bm.size = remoteSize;
+        updateBookmarkSize(bm.filename, remoteSize);
         return true;
       }
-      bm.size = '未知';
       return false;
-    })).then(results => {
-      if (results.some(r => r === true)) {
-        saveBookmarks(bookmarks);
-      }
-    }).catch(() => {});
+    })).catch(() => {});
   }
 
-  // 确保每个收藏条目的 size 都有确切值，获取不到统一为 '未知'
+  // 确保每个收藏条目的 size 都有确切值
   bookmarks = bookmarks.map(b => ({
     ...b,
     size: (b.size && typeof b.size === 'string' && b.size.trim()) ? b.size : '未知'
@@ -604,11 +352,7 @@ app.post('/api/bookmarks', async (req, res) => {
       return res.status(400).json({ success: false, error: '缺少 repoId 或 filename' });
     }
 
-    const config = loadConfig();
-    const bookmarks = loadBookmarks();
-    const existingIndex = bookmarks.findIndex(
-      b => b.repoId === bookmark.repoId && b.filename === bookmark.filename
-    );
+    const { config } = getEffectiveConfig();
 
     // 优先检查本地磁盘是否已有该模型
     let calculatedSize = bookmark.size;
@@ -619,7 +363,7 @@ app.post('/api/bookmarks', async (req, res) => {
         calculatedSize = formatBytes(stats.size);
       } catch (e) {}
     } else if (!calculatedSize || calculatedSize === '未知') {
-      // 尝试远程获取一次（未联网或拉取失败时返回 null）
+      // 尝试远程获取一次
       const remoteSize = await fetchRemoteFileSize(bookmark.repoId, bookmark.filename, config.hfMirror);
       if (remoteSize) {
         calculatedSize = remoteSize;
@@ -628,29 +372,12 @@ app.post('/api/bookmarks', async (req, res) => {
 
     const finalSize = (calculatedSize && typeof calculatedSize === 'string' && calculatedSize.trim()) ? calculatedSize : '未知';
 
-    if (existingIndex >= 0) {
-      bookmarks[existingIndex] = { 
-        ...bookmarks[existingIndex], 
-        ...bookmark,
-        size: finalSize
-      };
-    } else {
-      const newBm = {
-        id: 'bm_' + Date.now(),
-        name: bookmark.name || bookmark.filename,
-        repoId: bookmark.repoId,
-        filename: bookmark.filename,
-        sourceUrl: bookmark.sourceUrl || `hf://${bookmark.repoId}/${bookmark.filename}`,
-        description: bookmark.description || '',
-        tags: bookmark.tags || [],
-        size: finalSize,
-        addedAt: new Date().toISOString()
-      };
-      bookmarks.unshift(newBm);
-    }
+    const savedList = saveBookmark({
+      ...bookmark,
+      size: finalSize
+    });
 
-    saveBookmarks(bookmarks);
-    res.json({ success: true, bookmarks });
+    res.json({ success: true, bookmarks: savedList });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -658,10 +385,22 @@ app.post('/api/bookmarks', async (req, res) => {
 
 app.delete('/api/bookmarks/:id', (req, res) => {
   try {
-    let bookmarks = loadBookmarks();
-    bookmarks = bookmarks.filter(b => b.id !== req.params.id);
-    saveBookmarks(bookmarks);
-    res.json({ success: true, bookmarks });
+    const updatedList = deleteBookmark(req.params.id);
+    res.json({ success: true, bookmarks: updatedList });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
+// 一键重置收藏夹为出厂默认推荐列表 (JSON 模板)
+app.post('/api/bookmarks/reset', (req, res) => {
+  try {
+    const bookmarks = resetBookmarksToDefault();
+    res.json({ 
+      success: true, 
+      message: '已恢复出厂默认推荐模型收藏夹', 
+      bookmarks 
+    });
   } catch (e) {
     res.status(500).json({ success: false, error: e.message });
   }
@@ -685,7 +424,7 @@ app.get('/api/download/jobs', (req, res) => {
 
 app.post('/api/download/start', (req, res) => {
   try {
-    const config = loadConfig();
+    const { config } = getEffectiveConfig();
     const {
       repoId,
       filename,
@@ -728,61 +467,43 @@ app.post('/api/test-chat', async (req, res) => {
     return res.status(503).json({ error: 'Llama 服务尚未启动或未就绪' });
   }
 
-  const { prompt, messages, temperature = 0.7, max_tokens = 4096, stream = true } = req.body;
+  const { host, port } = status;
+  const { messages = [], stream = false, temperature = 0.7, max_tokens = 1024 } = req.body;
 
-  const chatMessages = messages || [
-    { role: 'user', content: prompt || '你好，请用一句话介绍你自己。' }
-  ];
+  const llamaReqBody = JSON.stringify({
+    messages,
+    stream,
+    temperature,
+    max_tokens
+  });
 
-  const targetUrl = `http://${status.host}:${status.port}/v1/chat/completions`;
+  const llamaReq = http.request({
+    hostname: host,
+    port: port,
+    path: '/v1/chat/completions',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(llamaReqBody)
+    }
+  }, (llamaRes) => {
+    res.writeHead(llamaRes.statusCode, llamaRes.headers);
+    llamaRes.pipe(res);
+  });
 
-  try {
-    const postData = JSON.stringify({
-      messages: chatMessages,
-      temperature,
-      top_p: 0.9,
-      max_tokens: max_tokens || 4096,
-      stream: stream,
-      stop: ["<|im_end|>", "<|im_start|>", "<|endoftext|>", "\n<|im_end|>", "\n<|im_start|>"]
-    });
-
-    const parsedUrl = new URL(targetUrl);
-    const proxyReq = http.request({
-      hostname: parsedUrl.hostname,
-      port: parsedUrl.port,
-      path: parsedUrl.pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData)
-      },
-      timeout: 0
-    }, (proxyRes) => {
-      if (stream) {
-        res.writeHead(proxyRes.statusCode || 200, {
-          'Content-Type': 'text/event-stream; charset=utf-8',
-          'Cache-Control': 'no-cache, no-transform',
-          'Connection': 'keep-alive',
-          'X-Accel-Buffering': 'no'
-        });
-        proxyRes.pipe(res);
+  llamaReq.on('error', (err) => {
+    if (!res.headersSent) {
+      if (err.code === 'ECONNREFUSED') {
+        res.status(500).json({ error: `连接 llama-server 失败: 服务未就绪 (http://${host}:${port})` });
       } else {
-        let body = '';
-        proxyRes.on('data', chunk => body += chunk);
-        proxyRes.on('end', () => {
-          res.status(proxyRes.statusCode || 200).send(body);
-        });
-      }
-    });
-
-    proxyReq.on('error', (err) => {
-      if (!res.headersSent) {
         res.status(500).json({ error: `连接 llama-server 失败: ${err.message}` });
       }
-    });
+    }
+  });
 
-    proxyReq.write(postData);
-    proxyReq.end();
+  try {
+    llamaReq.write(llamaReqBody);
+    llamaReq.end();
   } catch (err) {
     if (!res.headersSent) {
       res.status(500).json({ error: err.message });
@@ -790,26 +511,18 @@ app.post('/api/test-chat', async (req, res) => {
   }
 });
 
-// 全局下载完成监听：自动回写更新收藏夹条目的模型体积大小
+// 全局下载完成监听：自动回写更新 SQLite 收藏夹条目的模型体积大小
 hfDownloader.on('download_completed', (job) => {
   try {
-    const config = loadConfig();
-    let bookmarks = loadBookmarks();
-    let updated = false;
-    for (const bm of bookmarks) {
-      if (bm.filename === job.filename) {
-        if (job.totalFormatted && job.totalFormatted !== '未知' && job.totalFormatted !== '计算中...') {
-          bm.size = job.totalFormatted;
-          updated = true;
-        } else if (job.filePath && fs.existsSync(job.filePath)) {
-          const stats = fs.statSync(job.filePath);
-          bm.size = formatBytes(stats.size);
-          updated = true;
-        }
-      }
+    let size = null;
+    if (job.totalFormatted && job.totalFormatted !== '未知' && job.totalFormatted !== '计算中...') {
+      size = job.totalFormatted;
+    } else if (job.filePath && fs.existsSync(job.filePath)) {
+      const stats = fs.statSync(job.filePath);
+      size = formatBytes(stats.size);
     }
-    if (updated) {
-      saveBookmarks(bookmarks);
+    if (size && job.filename) {
+      updateBookmarkSize(job.filename, size);
     }
   } catch (e) {
     console.error('Error updating bookmark size on download completed:', e);
@@ -867,7 +580,7 @@ if (fs.existsSync(distPath)) {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`====================================================`);
-  console.log(`  🦙 Llama.cpp 管理后台服务已在端口 ${PORT} 启动`);
+  console.log(`  🦙 Llama.cpp 管理后台服务已在端口 ${PORT} 启动 (SQLite + JSON 分层存储架构)`);
   console.log(`  🚀 运行进程 PID: ${process.pid}`);
   console.log(`  🌐 本地 IPv4 访问: http://127.0.0.1:${PORT}`);
   console.log(`  🌐 本地 IPv6/域名: http://localhost:${PORT}`);
@@ -886,4 +599,3 @@ server.on('error', (err) => {
     console.error('Server error:', err);
   }
 });
-

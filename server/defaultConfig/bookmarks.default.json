@@ -1,32 +1,4 @@
 [
-    {
-    "id": "bm_1787024912872",
-    "name": "qwen2.5-coder-7b-instruct-q4_k_m",
-    "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
-    "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
-    "sourceUrl": "hf download hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
-    "description": "从 HuggingFace 导入的模型",
-    "tags": [
-      "GGUF",
-      "Qwen"
-    ],
-    "size": "4.36 GB",
-    "addedAt": "2026-08-18T03:48:32.872Z"
-  },
-  {
-    "id": "bm_1787024890818",
-    "name": "qwen2.5-coder-7b-instruct-q5_k_m",
-    "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
-    "filename": "qwen2.5-coder-7b-instruct-q5_k_m.gguf",
-    "sourceUrl": "hf download hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q5_k_m.gguf",
-    "description": "从 HuggingFace 导入的模型",
-    "tags": [
-      "GGUF",
-      "Qwen"
-    ],
-    "size": "5.07 GB",
-    "addedAt": "2026-08-18T03:48:10.818Z"
-  },
   {
     "id": "bm-1",
     "name": "Qwen3.8 9B (Q4_K_M)",
@@ -38,7 +10,7 @@
       "Qwen",
       "9B",
       "Q4_K_M",
-      "General"
+      "通用问答"
     ],
     "size": "5.38 GB",
     "addedAt": "2026-08-18T10:00:00.000Z"
@@ -54,7 +26,7 @@
       "Qwen",
       "DeepSeek",
       "Flash",
-      "Q4_K_M"
+      "极速推理"
     ],
     "size": "5.24 GB",
     "addedAt": "2026-08-18T10:05:00.000Z"
@@ -70,9 +42,41 @@
       "Qwen",
       "Uncensored",
       "Q5_0",
-      "9B"
+      "自由创作"
     ],
     "size": "5.87 GB",
     "addedAt": "2026-08-18T10:10:00.000Z"
+  },
+  {
+    "id": "bm-4",
+    "name": "Qwen2.5-Coder 7B Instruct (Q4_K_M)",
+    "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "filename": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "sourceUrl": "hf download hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "description": "顶级代码大模型，针对代码重构、生成与 Debug 深度优化",
+    "tags": [
+      "Coder",
+      "代码生成",
+      "7B",
+      "Q4_K_M"
+    ],
+    "size": "4.36 GB",
+    "addedAt": "2026-08-18T10:15:00.000Z"
+  },
+  {
+    "id": "bm-5",
+    "name": "Qwen2.5-Coder 7B Instruct (Q5_K_M)",
+    "repoId": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "filename": "qwen2.5-coder-7b-instruct-q5_k_m.gguf",
+    "sourceUrl": "hf download hf://Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/qwen2.5-coder-7b-instruct-q5_k_m.gguf",
+    "description": "更高精度的代码模型版本，注意力感知更敏锐",
+    "tags": [
+      "Coder",
+      "高精度",
+      "7B",
+      "Q5_K_M"
+    ],
+    "size": "5.07 GB",
+    "addedAt": "2026-08-18T10:20:00.000Z"
   }
 ]

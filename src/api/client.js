@@ -30,6 +30,7 @@ export const api = {
   // 系统配置
   getConfig: () => request('/api/config'),
   saveConfig: (config) => request('/api/config', { method: 'POST', body: JSON.stringify(config) }),
+  resetConfig: () => request('/api/config/reset', { method: 'POST' }),
   detectPaths: () => request('/api/config/detect-paths', { method: 'POST' }),
 
   // 本地模型与文件选择
@@ -51,6 +52,7 @@ export const api = {
   getBookmarks: () => request('/api/bookmarks'),
   saveBookmark: (bookmark) => request('/api/bookmarks', { method: 'POST', body: JSON.stringify(bookmark) }),
   deleteBookmark: (id) => request(`/api/bookmarks/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  resetBookmarks: () => request('/api/bookmarks/reset', { method: 'POST' }),
 
   // HF 链接解析与下载
   parseHf: (input) => request('/api/hf/parse', { method: 'POST', body: JSON.stringify({ input }) }),

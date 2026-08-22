@@ -15,14 +15,18 @@ import {
   RefreshCw,
   FolderSearch,
   FileCode,
-  HardDrive
+  HardDrive,
+  Database,
+  RotateCcw
 } from 'lucide-react';
 import { api } from '../api/client.js';
 import FileBrowserModal from './FileBrowserModal.jsx';
 
 export default function SettingsTab({
   config,
+  configMeta = {},
   onSaveConfig,
+  onResetConfig,
   onOpenFolder,
   addToast
 }) {
@@ -36,8 +40,25 @@ export default function SettingsTab({
   });
 
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [detecting, setDetecting] = useState(false);
   const [activeCodeTab, setActiveCodeTab] = useState('python');
+
+  const handleResetDefaults = async () => {
+    if (!window.confirm('确定要清空 SQLite 个人参数并恢复为出厂默认初始化配置 (JSON) 吗？')) {
+      return;
+    }
+    setResetting(true);
+    try {
+      if (onResetConfig) {
+        await onResetConfig();
+      }
+    } catch (e) {
+      addToast?.({ type: 'error', title: '重置失败', message: e.message });
+    } finally {
+      setResetting(false);
+    }
+  };
 
   // 文件/目录树浏览弹窗状态
   const [browserModal, setBrowserModal] = useState({
@@ -255,27 +276,41 @@ for chunk in response:
           gap: '12px',
           marginBottom: '20px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Settings size={22} style={{ color: '#38bdf8' }} />
-            <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Settings size={22} style={{ color: '#38bdf8' }} />
+              <h2 style={{ fontSize: '18px', fontWeight: 800 }}>系统路径与网络接口设置</h2>
+            </div>
+            
+            {/* 存储模式指示器 */}
+            <span 
+              className={`badge ${configMeta.isCustomized ? 'badge-amber' : 'badge-green'}`} 
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 10px', fontSize: '12px' }}
+              title={configMeta.isCustomized ? '已启用 SQLite 个人易变参数覆盖' : '使用出厂 JSON 初始化参数'}
+            >
+              <Database size={13} />
+              {configMeta.isCustomized ? 'SQLite 个人参数 (覆盖生效)' : 'JSON 初始默认配置'}
+            </span>
           </div>
 
-          <button
-            type="button"
-            onClick={handleAutoDetect}
-            disabled={detecting}
-            className="btn btn-secondary"
-            style={{
-              padding: '6px 14px',
-              fontSize: '13px',
-              color: '#38bdf8',
-              borderColor: 'rgba(56, 189, 248, 0.4)',
-              background: 'rgba(56, 189, 248, 0.08)'
-            }}
-          >
-            <Sparkles size={15} />
-            {detecting ? '正在扫描路径...' : '自动扫描路径'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={handleAutoDetect}
+              disabled={detecting}
+              className="btn btn-secondary"
+              style={{
+                padding: '6px 14px',
+                fontSize: '13px',
+                color: '#38bdf8',
+                borderColor: 'rgba(56, 189, 248, 0.4)',
+                background: 'rgba(56, 189, 248, 0.08)'
+              }}
+            >
+              <Sparkles size={15} />
+              {detecting ? '正在扫描路径...' : '自动扫描路径'}
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
@@ -451,11 +486,43 @@ for chunk in response:
             </div>
           </div>
 
-          {/* 提交保存 */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
-            <button type="submit" disabled={saving} className="btn btn-primary" style={{ padding: '10px 24px' }}>
+          {/* 提交保存与恢复默认 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: '14px',
+            flexWrap: 'wrap',
+            gap: '12px',
+            paddingTop: '16px',
+            borderTop: '1px solid rgba(255,255,255,0.06)'
+          }}>
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              disabled={resetting || saving}
+              className="btn btn-ghost"
+              style={{
+                color: '#f87171',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                background: 'rgba(239, 68, 68, 0.05)',
+                fontSize: '13px',
+                padding: '8px 16px'
+              }}
+              title="清空 SQLite 中的个人参数，回退至出厂 JSON 初始化模板"
+            >
+              <RotateCcw size={15} />
+              {resetting ? '正在恢复...' : '恢复出厂初始化配置 (JSON)'}
+            </button>
+
+            <button 
+              type="submit" 
+              disabled={saving || resetting} 
+              className="btn btn-primary" 
+              style={{ padding: '10px 24px' }}
+            >
               <Save size={16} />
-              {saving ? '正在保存...' : '保存配置'}
+              {saving ? '正在持久化...' : '保存个人配置 (SQLite)'}
             </button>
           </div>
         </form>
